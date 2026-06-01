@@ -37,10 +37,16 @@ The app runs as a menu bar utility and hides its Dock icon at launch.
 
 ```sh
 swift run tangle clean
+swift run tangle clean --mode aggressive --stats
 swift run tangle clean --clipboard
 swift run tangle url
+swift run tangle markdown
+swift run tangle markdown --preset llm --stats
+swift run tangle table --to markdown
+swift run tangle table --to csv
 pbpaste | swift run tangle url | pbcopy
 cat notes.txt | swift run tangle clean
+pbpaste | swift run tangle markdown --preset llm | pbcopy
 ```
 
 When stdin is piped, the CLI reads stdin and writes stdout. With `--clipboard`, or when no stdin is piped, it reads and writes the macOS clipboard.
@@ -60,18 +66,38 @@ Implemented in this first version:
   - Removes safe invisible/control characters.
   - Collapses repeated blank lines.
   - Joins common wrapped paragraph text.
+  - Repairs common PDF hyphenated line breaks.
+  - Removes repeated short header/footer noise after the first occurrence.
 - Clean URL
   - Removes common tracking parameters such as `utm_*`, `fbclid`, `gclid`, `mc_cid`, and `mc_eid`.
   - Preserves meaningful query parameters.
   - Supports multiple URLs in copied text.
+- Markdown
+  - Converts PDF/web text into conservative Markdown.
+  - Normalizes bullet characters.
+  - Converts underline headings and obvious all-caps headings.
+  - Includes an `llm` preset for compact, token-conscious output.
+- Table conversion
+  - Converts TSV-like and CSV-like copied text to Markdown tables, CSV, or TSV.
+  - Escapes quoted CSV values safely.
 
-Scaffolded for iteration:
+Still early and intentionally conservative:
 
-- Markdown normalization
-- Table conversion to Markdown, CSV, and TSV
 - Settings persistence
 - Menu bar actions
 - Optional paste-after-transform behavior
+- Global keyboard shortcuts
+- App bundle packaging
+
+## PDF/Text to LLM Markdown
+
+One of Tangle's core workflows is cleaning text copied from PDFs before sending it to an LLM:
+
+```sh
+pbpaste | swift run tangle markdown --preset llm --stats | pbcopy
+```
+
+This keeps the transformation local while reducing common token waste from wrapped lines, repeated page headers, page numbers, and inconsistent bullets.
 
 ## Privacy
 

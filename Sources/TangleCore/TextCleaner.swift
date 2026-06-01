@@ -2,6 +2,7 @@ import Foundation
 
 public enum ParagraphPreservation: String, Codable, Sendable, CaseIterable {
     case conservative
+    case balanced
     case aggressive
 }
 
@@ -13,13 +14,13 @@ public struct TextCleaner: Sendable {
     }
 
     public func clean(_ input: String) -> String {
-        let normalized = normalizeScalars(input)
+        let normalized = repairHyphenatedLineBreaks(normalizeScalars(input))
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
 
-        let lines = normalized
+        let lines = removeRepeatedNoiseLines(from: normalized
             .components(separatedBy: "\n")
-            .map { normalizeInlineWhitespace($0).trimmingCharacters(in: .whitespaces) }
+            .map { normalizeInlineWhitespace($0).trimmingCharacters(in: .whitespaces) })
 
         let paragraphs = splitIntoParagraphs(lines)
         let cleanedParagraphs = paragraphs.map(cleanParagraph)
@@ -54,6 +55,36 @@ public struct TextCleaner: Sendable {
             .replacingOccurrences(of: #"[ ]{2,}"#, with: " ", options: .regularExpression)
     }
 
+    private func repairHyphenatedLineBreaks(_ input: String) -> String {
+        input.replacingOccurrences(
+            of: #"([A-Za-zÀ-ÖØ-öø-ÿ])-\n([a-zà-öø-ÿ])"#,
+            with: "$1$2",
+            options: .regularExpression
+        )
+    }
+
+    private func removeRepeatedNoiseLines(from lines: [String]) -> [String] {
+        let counts = Dictionary(grouping: lines.filter { !$0.isEmpty }, by: { $0 })
+            .mapValues(\.count)
+        var seenRepeatedNoise = Set<String>()
+
+        return lines.filter { line in
+            if line.range(of: #"^\d{1,4}$"#, options: .regularExpression) != nil {
+                return false
+            }
+
+            guard let count = counts[line], count >= 3 else { return true }
+            guard line.count <= 80 else { return true }
+
+            if seenRepeatedNoise.contains(line) {
+                return false
+            }
+
+            seenRepeatedNoise.insert(line)
+            return true
+        }
+    }
+
     private func splitIntoParagraphs(_ lines: [String]) -> [[String]] {
         var paragraphs: [[String]] = []
         var current: [String] = []
@@ -86,6 +117,8 @@ public struct TextCleaner: Sendable {
         switch paragraphPreservation {
         case .conservative:
             return lines.joined(separator: " ")
+        case .balanced:
+            return balancedJoinWrappedLines(lines)
         case .aggressive:
             return aggressivelyJoinWrappedLines(lines)
         }
@@ -97,8 +130,34 @@ public struct TextCleaner: Sendable {
             || line.hasPrefix("- ")
             || line.hasPrefix("* ")
             || line.hasPrefix("+ ")
+            || line.hasPrefix("|")
             || line.hasPrefix("```")
+            || line.range(of: #"^(=|-){3,}$"#, options: .regularExpression) != nil
+            || line.range(of: #"^[-*+]\s+"#, options: .regularExpression) != nil
+            || line.range(of: #"^[•·▪‣]\s+"#, options: .regularExpression) != nil
             || line.range(of: #"^\d+[\.)]\s+"#, options: .regularExpression) != nil
+    }
+
+    private func balancedJoinWrappedLines(_ lines: [String]) -> String {
+        var output = ""
+
+        for line in lines {
+            if output.isEmpty {
+                output = line
+                continue
+            }
+
+            if output.last == "-" {
+                output.removeLast()
+                output += line
+            } else if output.last?.isHardBoundary == true || line.looksLikeHeading {
+                output += "\n" + line
+            } else {
+                output += " " + line
+            }
+        }
+
+        return output
     }
 
     private func aggressivelyJoinWrappedLines(_ lines: [String]) -> String {
@@ -127,5 +186,17 @@ public struct TextCleaner: Sendable {
 private extension Character {
     var isSentenceTerminator: Bool {
         self == "." || self == "!" || self == "?" || self == ":" || self == ";"
+    }
+
+    var isHardBoundary: Bool {
+        self == "." || self == "!" || self == "?"
+    }
+}
+
+private extension String {
+    var looksLikeHeading: Bool {
+        count <= 80
+            && range(of: #"[.!?]$"#, options: .regularExpression) == nil
+            && range(of: #"[A-Za-zÀ-ÖØ-öø-ÿ]"#, options: .regularExpression) != nil
     }
 }

@@ -112,6 +112,7 @@ struct SettingsView: View {
 
             Picker("Paragraph preservation", selection: $model.settings.paragraphPreservation) {
                 Text("Conservative").tag(ParagraphPreservation.conservative)
+                Text("Balanced").tag(ParagraphPreservation.balanced)
                 Text("Aggressive").tag(ParagraphPreservation.aggressive)
             }
 

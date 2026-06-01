@@ -10,7 +10,7 @@ public struct TangleSettings: Codable, Equatable, Sendable {
     public init(
         isHUDEnabled: Bool = true,
         autoPasteAfterTransform: Bool = false,
-        paragraphPreservation: ParagraphPreservation = .conservative,
+        paragraphPreservation: ParagraphPreservation = .balanced,
         allowedURLParameters: Set<String> = [],
         blockedURLParameters: Set<String> = URLCleaner.defaultBlockedParameters
     ) {
