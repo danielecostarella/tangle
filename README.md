@@ -35,13 +35,15 @@ The app runs as a menu bar utility and hides its Dock icon at launch.
 
 Current menu bar actions:
 
-- Clean Clipboard
-- Clean URL
-- Convert to Markdown
-- Paste Cleaned Text
+- Clean Clipboard: `Control` + `Option` + `Command` + `C`
+- Clean URL: `Control` + `Option` + `Command` + `U`
+- Convert to Markdown: `Control` + `Option` + `Command` + `M`
+- Paste Cleaned Text: `Control` + `Option` + `Command` + `V`
 - Convert Table to Markdown, CSV, or TSV
 
 The settings window includes HUD feedback, auto-paste, cleanup mode, Markdown preset, and URL parameter reset controls.
+
+Clipboard-only shortcuts do not send text anywhere. Auto-paste simulates `Command` + `V` locally and may require macOS Accessibility permission.
 
 ## CLI
 
@@ -98,6 +100,7 @@ Still needs product hardening:
 - App icon and menu bar asset
 - Preview/diff window
 - Shortcut customization
+- Accessibility permission guidance for auto-paste
 
 ## PDF/Text to LLM Markdown
 

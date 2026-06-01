@@ -12,28 +12,28 @@ struct TangleGUIApp: App {
             Button {
                 model.transformClipboard(.cleanText, message: "Clipboard cleaned")
             } label: {
-                Label("Clean Clipboard", systemImage: "wand.and.sparkles")
+                Label("Clean Clipboard    ⌃⌥⌘C", systemImage: "wand.and.sparkles")
             }
             .keyboardShortcut("c")
 
             Button {
                 model.transformClipboard(.cleanURL, message: "URL tracking removed")
             } label: {
-                Label("Clean URL", systemImage: "link")
+                Label("Clean URL    ⌃⌥⌘U", systemImage: "link")
             }
             .keyboardShortcut("u")
 
             Button {
                 model.transformClipboard(.markdown, message: "Converted to Markdown")
             } label: {
-                Label("Convert to Markdown", systemImage: "text.quote")
+                Label("Convert to Markdown    ⌃⌥⌘M", systemImage: "text.quote")
             }
             .keyboardShortcut("m")
 
             Button {
                 model.transformClipboard(.plainPaste, message: "Plain text ready")
             } label: {
-                Label("Paste Cleaned Text", systemImage: "doc.on.clipboard")
+                Label("Paste Cleaned Text    ⌃⌥⌘V", systemImage: "doc.on.clipboard")
             }
             .keyboardShortcut("v")
 
@@ -103,10 +103,12 @@ final class TangleAppModel: ObservableObject {
 
     private let clipboard = ClipboardClient()
     private let hud = HUDController()
+    private let shortcuts = GlobalShortcutManager()
     private let store = SettingsStore()
 
     init() {
         settings = store.load()
+        registerShortcuts()
     }
 
     func transformClipboard(_ kind: TransformationKind, message: String) {
@@ -139,6 +141,18 @@ final class TangleAppModel: ObservableObject {
     func resetURLParameters() {
         settings.allowedURLParameters = []
         settings.blockedURLParameters = URLCleaner.defaultBlockedParameters
+    }
+
+    private func registerShortcuts() {
+        shortcuts.registerDefaults {
+            self.transformClipboard(.cleanText, message: "Clipboard cleaned")
+        } cleanURL: {
+            self.transformClipboard(.cleanURL, message: "URL tracking removed")
+        } markdown: {
+            self.transformClipboard(.markdown, message: "Converted to Markdown")
+        } pasteCleanedText: {
+            self.transformClipboard(.plainPaste, message: "Plain text ready")
+        }
     }
 
     private func statusText(message: String, savings: Int) -> String {
@@ -190,6 +204,13 @@ struct SettingsView: View {
                 Section("Status") {
                     Text(model.statusMessage.isEmpty ? "Ready" : model.statusMessage)
                         .foregroundStyle(.secondary)
+                }
+
+                Section("Global Shortcuts") {
+                    LabeledContent("Clean Clipboard", value: "⌃⌥⌘C")
+                    LabeledContent("Clean URL", value: "⌃⌥⌘U")
+                    LabeledContent("Markdown", value: "⌃⌥⌘M")
+                    LabeledContent("Paste Cleaned Text", value: "⌃⌥⌘V")
                 }
             }
             .tabItem {
