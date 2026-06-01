@@ -39,4 +39,42 @@ final class TextCleanerTests: XCTestCase {
 
         XCTAssertEqual(output, "- One\n- Two\n- Three")
     }
+
+    func testRepairsPdfHyphenatedLineBreaks() {
+        let input = """
+        Clipboard transforma-
+        tions should stay local.
+        """
+
+        let output = TextCleaner().clean(input)
+
+        XCTAssertEqual(output, "Clipboard transformations should stay local.")
+    }
+
+    func testRemovesRepeatedShortHeadersAndPageNumbers() {
+        let input = """
+        TANGLE REPORT
+        1
+
+        First paragraph.
+
+        TANGLE REPORT
+        2
+
+        Second paragraph.
+
+        TANGLE REPORT
+        3
+        """
+
+        let output = TextCleaner().clean(input)
+
+        XCTAssertEqual(output, """
+        TANGLE REPORT
+
+        First paragraph.
+
+        Second paragraph.
+        """)
+    }
 }

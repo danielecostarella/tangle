@@ -1,5 +1,7 @@
 # Tangle
 
+[![CI](https://github.com/danielecostarella/tangle/actions/workflows/ci.yml/badge.svg)](https://github.com/danielecostarella/tangle/actions/workflows/ci.yml)
+
 Tangle is a lightweight, fast, privacy-first clipboard transformer for macOS.
 
 It sits in the menu bar, reads the current text clipboard, applies predictable local transformations, and writes the result back to the clipboard. There is no telemetry, no account system, no cloud processing, and no network dependency in the app itself.

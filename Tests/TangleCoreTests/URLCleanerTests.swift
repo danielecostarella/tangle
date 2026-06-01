@@ -30,4 +30,11 @@ final class URLCleanerTests: XCTestCase {
 
         XCTAssertEqual(output, "https://example.com/?utm_source=keep")
     }
+
+    func testRemovesAdditionalCommonTrackers() {
+        let input = "https://example.com/?gbraid=abc&wbraid=def&msclkid=ghi&q=tangle"
+        let output = URLCleaner().cleanURLs(in: input)
+
+        XCTAssertEqual(output, "https://example.com/?q=tangle")
+    }
 }
