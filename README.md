@@ -27,6 +27,20 @@ This repository currently contains the initial Swift package scaffold:
 swift build
 ```
 
+## Package
+
+```sh
+scripts/package-app.sh
+```
+
+The package script creates:
+
+- `dist/Tangle.app`
+- `dist/Tangle.zip`
+- `dist/Tangle.dmg`
+
+The current DMG and ZIP are unsigned and not notarized. Notarization and Homebrew distribution are intentionally postponed.
+
 ## Run the Menu Bar App
 
 ```sh
@@ -46,6 +60,8 @@ Current menu bar actions:
 The settings window includes HUD feedback, auto-paste, cleanup mode, Markdown preset, and URL parameter reset controls.
 
 Clipboard-only shortcuts do not send text anywhere. Auto-paste simulates `Command` + `V` locally and may require macOS Accessibility permission.
+
+Shortcut keys are customizable in Settings. The modifier chord is fixed to `Control` + `Option` + `Command` for this first release.
 
 ## CLI
 
@@ -97,12 +113,10 @@ Implemented in this first version:
 
 Still needs product hardening:
 
-- Global keyboard shortcuts
-- App bundle packaging
-- App icon and menu bar asset
 - Preview/diff window
-- Shortcut customization
-- Accessibility permission guidance for auto-paste
+- Better visual preview for Accessibility permission state
+- Signed and notarized release artifacts
+- Homebrew cask
 
 ## PDF/Text to LLM Markdown
 

@@ -50,7 +50,7 @@ public struct MarkdownTransformer: Sendable {
             index += 1
         }
 
-        return collapseBlankLines(output)
+        return joinProseLines(collapseBlankLines(output))
     }
 
     private func normalizeLine(_ line: String) -> String {
@@ -102,6 +102,25 @@ public struct MarkdownTransformer: Sendable {
         return output
     }
 
+    private func joinProseLines(_ lines: [String]) -> [String] {
+        var output: [String] = []
+
+        for line in lines {
+            guard let previous = output.last,
+                  !previous.isEmpty,
+                  !line.isEmpty,
+                  previous.isMarkdownProse,
+                  line.isMarkdownProse else {
+                output.append(line)
+                continue
+            }
+
+            output[output.count - 1] = previous + " " + line
+        }
+
+        return output
+    }
+
     private func compactForLLM(_ markdown: String) -> String {
         markdown
             .replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
@@ -127,5 +146,15 @@ private extension String {
                 return first.uppercased() + lower.dropFirst()
             }
             .joined(separator: " ")
+    }
+
+    var isMarkdownProse: Bool {
+        !hasPrefix("#")
+            && !hasPrefix("- ")
+            && !hasPrefix("* ")
+            && !hasPrefix("+ ")
+            && !hasPrefix("> ")
+            && !hasPrefix("|")
+            && !hasPrefix("```")
     }
 }

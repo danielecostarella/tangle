@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import SwiftUI
 import TangleCore
 
@@ -8,32 +9,32 @@ struct TangleGUIApp: App {
     @StateObject private var model = TangleAppModel()
 
     var body: some Scene {
-        MenuBarExtra("Tangle", systemImage: "text.badge.checkmark") {
+        MenuBarExtra {
             Button {
                 model.transformClipboard(.cleanText, message: "Clipboard cleaned")
             } label: {
-                Label("Clean Clipboard    ⌃⌥⌘C", systemImage: "wand.and.sparkles")
+                Label("Clean Clipboard    \(model.shortcutDisplay(for: .cleanClipboard))", systemImage: "wand.and.sparkles")
             }
             .keyboardShortcut("c")
 
             Button {
                 model.transformClipboard(.cleanURL, message: "URL tracking removed")
             } label: {
-                Label("Clean URL    ⌃⌥⌘U", systemImage: "link")
+                Label("Clean URL    \(model.shortcutDisplay(for: .cleanURL))", systemImage: "link")
             }
             .keyboardShortcut("u")
 
             Button {
                 model.transformClipboard(.markdown, message: "Converted to Markdown")
             } label: {
-                Label("Convert to Markdown    ⌃⌥⌘M", systemImage: "text.quote")
+                Label("Convert to Markdown    \(model.shortcutDisplay(for: .markdown))", systemImage: "text.quote")
             }
             .keyboardShortcut("m")
 
             Button {
                 model.transformClipboard(.plainPaste, message: "Plain text ready")
             } label: {
-                Label("Paste Cleaned Text    ⌃⌥⌘V", systemImage: "doc.on.clipboard")
+                Label("Paste Cleaned Text    \(model.shortcutDisplay(for: .pasteCleanedText))", systemImage: "doc.on.clipboard")
             }
             .keyboardShortcut("v")
 
@@ -76,6 +77,9 @@ struct TangleGUIApp: App {
                 Label("Quit", systemImage: "power")
             }
             .keyboardShortcut("q")
+        } label: {
+            Image(nsImage: TangleMenuBarIcon.image)
+                .accessibilityLabel("Tangle")
         }
 
         Settings {
@@ -95,6 +99,7 @@ final class TangleAppModel: ObservableObject {
     @Published var settings: TangleSettings {
         didSet {
             store.save(settings)
+            registerShortcuts()
         }
     }
 
@@ -143,8 +148,31 @@ final class TangleAppModel: ObservableObject {
         settings.blockedURLParameters = URLCleaner.defaultBlockedParameters
     }
 
+    func shortcutDisplay(for action: TangleShortcutAction) -> String {
+        (settings.shortcutKeys[action] ?? TangleSettings.defaultShortcutKeys[action] ?? .c).displayName
+    }
+
+    func requestAccessibilityPermission() {
+        let options = [
+            "AXTrustedCheckOptionPrompt": true
+        ] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
+    }
+
+    func openAccessibilitySettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else {
+            return
+        }
+
+        NSWorkspace.shared.open(url)
+    }
+
+    var isAccessibilityTrusted: Bool {
+        AXIsProcessTrusted()
+    }
+
     private func registerShortcuts() {
-        shortcuts.registerDefaults {
+        shortcuts.register(shortcutKeys: settings.shortcutKeys) {
             self.transformClipboard(.cleanText, message: "Clipboard cleaned")
         } cleanURL: {
             self.transformClipboard(.cleanURL, message: "URL tracking removed")
@@ -186,6 +214,20 @@ struct SettingsView: View {
                 Section("Behavior") {
                     Toggle("HUD", isOn: $model.settings.isHUDEnabled)
                     Toggle("Auto-paste", isOn: $model.settings.autoPasteAfterTransform)
+
+                    if model.settings.autoPasteAfterTransform {
+                        LabeledContent("Accessibility", value: model.isAccessibilityTrusted ? "Allowed" : "Required")
+
+                        HStack {
+                            Button("Request Permission") {
+                                model.requestAccessibilityPermission()
+                            }
+
+                            Button("Open Settings") {
+                                model.openAccessibilitySettings()
+                            }
+                        }
+                    }
                 }
 
                 Section("Transformations") {
@@ -207,10 +249,10 @@ struct SettingsView: View {
                 }
 
                 Section("Global Shortcuts") {
-                    LabeledContent("Clean Clipboard", value: "⌃⌥⌘C")
-                    LabeledContent("Clean URL", value: "⌃⌥⌘U")
-                    LabeledContent("Markdown", value: "⌃⌥⌘M")
-                    LabeledContent("Paste Cleaned Text", value: "⌃⌥⌘V")
+                    ShortcutPicker(action: .cleanClipboard, model: model)
+                    ShortcutPicker(action: .cleanURL, model: model)
+                    ShortcutPicker(action: .markdown, model: model)
+                    ShortcutPicker(action: .pasteCleanedText, model: model)
                 }
             }
             .tabItem {
@@ -219,8 +261,15 @@ struct SettingsView: View {
 
             Form {
                 Section("URL Parameters") {
-                    LabeledContent("Blocked", value: "\(model.settings.blockedURLParameters.count)")
-                    LabeledContent("Allowed", value: "\(model.settings.allowedURLParameters.count)")
+                    ParameterListEditor(
+                        title: "Blocked",
+                        parameters: $model.settings.blockedURLParameters
+                    )
+
+                    ParameterListEditor(
+                        title: "Allowed",
+                        parameters: $model.settings.allowedURLParameters
+                    )
 
                     Button("Reset Defaults") {
                         model.resetURLParameters()
@@ -232,6 +281,61 @@ struct SettingsView: View {
             }
         }
         .padding(24)
-        .frame(width: 440, height: 280)
+        .frame(width: 520, height: 420)
+    }
+}
+
+struct ShortcutPicker: View {
+    let action: TangleShortcutAction
+    @ObservedObject var model: TangleAppModel
+
+    var body: some View {
+        Picker(action.label, selection: shortcutBinding) {
+            ForEach(TangleShortcutKey.allCases, id: \.self) { key in
+                Text(key.displayName).tag(key)
+            }
+        }
+    }
+
+    private var shortcutBinding: Binding<TangleShortcutKey> {
+        Binding {
+            model.settings.shortcutKeys[action] ?? TangleSettings.defaultShortcutKeys[action] ?? .c
+        } set: { newValue in
+            model.settings.shortcutKeys[action] = newValue
+        }
+    }
+}
+
+struct ParameterListEditor: View {
+    let title: String
+    @Binding var parameters: Set<String>
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.headline)
+
+            TextEditor(text: textBinding)
+                .font(.system(.body, design: .monospaced))
+                .frame(minHeight: 96)
+                .border(.separator)
+
+            Text("\(parameters.count) entries")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var textBinding: Binding<String> {
+        Binding {
+            parameters.sorted().joined(separator: "\n")
+        } set: { value in
+            parameters = Set(
+                value
+                    .components(separatedBy: CharacterSet(charactersIn: ",\n\t "))
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+                    .filter { !$0.isEmpty }
+            )
+        }
     }
 }

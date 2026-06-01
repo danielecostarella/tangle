@@ -17,6 +17,12 @@ final class SettingsStoreTests: XCTestCase {
             autoPasteAfterTransform: true,
             paragraphPreservation: .aggressive,
             markdownPreset: .standard,
+            shortcutKeys: [
+                .cleanClipboard: .x,
+                .cleanURL: .u,
+                .markdown: .m,
+                .pasteCleanedText: .p
+            ],
             allowedURLParameters: ["id"],
             blockedURLParameters: ["utm_source"]
         )
@@ -43,6 +49,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(settings.autoPasteAfterTransform)
         XCTAssertEqual(settings.paragraphPreservation, .conservative)
         XCTAssertEqual(settings.markdownPreset, .llm)
+        XCTAssertEqual(settings.shortcutKeys, TangleSettings.defaultShortcutKeys)
         XCTAssertEqual(settings.allowedURLParameters, ["id"])
         XCTAssertEqual(settings.blockedURLParameters, ["utm_source"])
     }

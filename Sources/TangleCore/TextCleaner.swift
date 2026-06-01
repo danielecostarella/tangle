@@ -134,8 +134,9 @@ public struct TextCleaner: Sendable {
             || line.hasPrefix("```")
             || line.range(of: #"^(=|-){3,}$"#, options: .regularExpression) != nil
             || line.range(of: #"^[-*+]\s+"#, options: .regularExpression) != nil
-            || line.range(of: #"^[•·▪‣]\s+"#, options: .regularExpression) != nil
+            || line.range(of: #"^[•·▪‣–—]\s+"#, options: .regularExpression) != nil
             || line.range(of: #"^\d+[\.)]\s+"#, options: .regularExpression) != nil
+            || line.looksLikeAllCapsHeading
     }
 
     private func balancedJoinWrappedLines(_ lines: [String]) -> String {
@@ -150,7 +151,7 @@ public struct TextCleaner: Sendable {
             if output.last == "-" {
                 output.removeLast()
                 output += line
-            } else if output.last?.isHardBoundary == true || line.looksLikeHeading {
+            } else if output.last?.isHardBoundary == true {
                 output += "\n" + line
             } else {
                 output += " " + line
@@ -194,9 +195,11 @@ private extension Character {
 }
 
 private extension String {
-    var looksLikeHeading: Bool {
-        count <= 80
-            && range(of: #"[.!?]$"#, options: .regularExpression) == nil
-            && range(of: #"[A-Za-zÀ-ÖØ-öø-ÿ]"#, options: .regularExpression) != nil
+    var looksLikeAllCapsHeading: Bool {
+        count >= 3
+            && count <= 70
+            && uppercased() == self
+            && range(of: #"[A-ZÀ-ÖØ-Þ]"#, options: .regularExpression) != nil
+            && range(of: #"^\d+$"#, options: .regularExpression) == nil
     }
 }

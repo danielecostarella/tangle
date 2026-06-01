@@ -1,15 +1,29 @@
 import Carbon
 import Foundation
+import TangleCore
 
-enum GlobalShortcutID: UInt32, CaseIterable {
+private enum GlobalShortcutID: UInt32, CaseIterable {
     case cleanClipboard = 1
     case cleanURL = 2
     case markdown = 3
     case pasteCleanedText = 4
+
+    init(action: TangleShortcutAction) {
+        switch action {
+        case .cleanClipboard:
+            self = .cleanClipboard
+        case .cleanURL:
+            self = .cleanURL
+        case .markdown:
+            self = .markdown
+        case .pasteCleanedText:
+            self = .pasteCleanedText
+        }
+    }
 }
 
 struct GlobalShortcut: Identifiable, Sendable {
-    let id: GlobalShortcutID
+    let id: TangleShortcutAction
     let keyCode: UInt32
     let modifiers: UInt32
     let displayName: String
@@ -20,7 +34,8 @@ final class GlobalShortcutManager {
     private var registeredHotKeys: [EventHotKeyRef?] = []
     private var installedHandler: EventHandlerRef?
 
-    func registerDefaults(
+    func register(
+        shortcutKeys: [TangleShortcutAction: TangleShortcutKey],
         cleanClipboard: @escaping @MainActor () -> Void,
         cleanURL: @escaping @MainActor () -> Void,
         markdown: @escaping @MainActor () -> Void,
@@ -29,7 +44,7 @@ final class GlobalShortcutManager {
         unregisterAll()
         ShortcutActionStore.shared.removeAll()
 
-        let actions: [(GlobalShortcutID, @MainActor () -> Void)] = [
+        let actions: [(TangleShortcutAction, @MainActor () -> Void)] = [
             (.cleanClipboard, cleanClipboard),
             (.cleanURL, cleanURL),
             (.markdown, markdown),
@@ -37,7 +52,7 @@ final class GlobalShortcutManager {
         ]
 
         for (id, action) in actions {
-            ShortcutActionStore.shared.setAction(for: id.rawValue) {
+            ShortcutActionStore.shared.setAction(for: GlobalShortcutID(action: id).rawValue) {
                 Task { @MainActor in
                     action()
                 }
@@ -46,11 +61,11 @@ final class GlobalShortcutManager {
 
         installHandlerIfNeeded()
 
-        for shortcut in Self.defaultShortcuts {
+        for shortcut in Self.shortcuts(from: shortcutKeys) {
             var hotKeyRef: EventHotKeyRef?
             let hotKeyID = EventHotKeyID(
                 signature: Self.signature,
-                id: shortcut.id.rawValue
+                id: GlobalShortcutID(action: shortcut.id).rawValue
             )
 
             let status = RegisterEventHotKey(
@@ -96,34 +111,43 @@ final class GlobalShortcutManager {
         )
     }
 
-    static let defaultShortcuts: [GlobalShortcut] = [
-        GlobalShortcut(
-            id: .cleanClipboard,
-            keyCode: UInt32(kVK_ANSI_C),
-            modifiers: UInt32(cmdKey | optionKey | controlKey),
-            displayName: "⌃⌥⌘C"
-        ),
-        GlobalShortcut(
-            id: .cleanURL,
-            keyCode: UInt32(kVK_ANSI_U),
-            modifiers: UInt32(cmdKey | optionKey | controlKey),
-            displayName: "⌃⌥⌘U"
-        ),
-        GlobalShortcut(
-            id: .markdown,
-            keyCode: UInt32(kVK_ANSI_M),
-            modifiers: UInt32(cmdKey | optionKey | controlKey),
-            displayName: "⌃⌥⌘M"
-        ),
-        GlobalShortcut(
-            id: .pasteCleanedText,
-            keyCode: UInt32(kVK_ANSI_V),
-            modifiers: UInt32(cmdKey | optionKey | controlKey),
-            displayName: "⌃⌥⌘V"
-        )
-    ]
+    static func shortcuts(from keys: [TangleShortcutAction: TangleShortcutKey]) -> [GlobalShortcut] {
+        TangleShortcutAction.allCases.compactMap { action in
+            let key = keys[action] ?? TangleSettings.defaultShortcutKeys[action] ?? .c
+            guard let keyCode = key.carbonKeyCode else { return nil }
+            return GlobalShortcut(
+                id: action,
+                keyCode: keyCode,
+                modifiers: UInt32(cmdKey | optionKey | controlKey),
+                displayName: key.displayName
+            )
+        }
+    }
 
     private static let signature: OSType = 0x546E676C
+}
+
+private extension TangleShortcutKey {
+    var carbonKeyCode: UInt32? {
+        switch self {
+        case .c:
+            return UInt32(kVK_ANSI_C)
+        case .u:
+            return UInt32(kVK_ANSI_U)
+        case .m:
+            return UInt32(kVK_ANSI_M)
+        case .v:
+            return UInt32(kVK_ANSI_V)
+        case .x:
+            return UInt32(kVK_ANSI_X)
+        case .b:
+            return UInt32(kVK_ANSI_B)
+        case .k:
+            return UInt32(kVK_ANSI_K)
+        case .p:
+            return UInt32(kVK_ANSI_P)
+        }
+    }
 }
 
 private final class ShortcutActionStore: @unchecked Sendable {

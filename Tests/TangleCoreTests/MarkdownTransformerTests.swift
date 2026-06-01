@@ -2,6 +2,24 @@ import XCTest
 @testable import TangleCore
 
 final class MarkdownTransformerTests: XCTestCase {
+    func testPdfReportFixture() throws {
+        let input = try fixture(named: "pdf-report-input", extension: "txt")
+        let expected = try fixture(named: "pdf-report-expected", extension: "md")
+
+        let output = MarkdownTransformer(preset: .llm).transform(input)
+
+        XCTAssertEqual(output, expected)
+    }
+
+    func testWebArticleFixture() throws {
+        let input = try fixture(named: "web-article-input", extension: "txt")
+        let expected = try fixture(named: "web-article-expected", extension: "md")
+
+        let output = MarkdownTransformer(preset: .llm).transform(input)
+
+        XCTAssertEqual(output, expected)
+    }
+
     func testConvertsPdfLikeTextToCompactMarkdown() {
         let input = """
         TANGLE WHITEPAPER
@@ -55,5 +73,11 @@ final class MarkdownTransformerTests: XCTestCase {
 
         Tangle cleans clipboard text.
         """)
+    }
+
+    private func fixture(named name: String, extension fileExtension: String) throws -> String {
+        let url = try XCTUnwrap(Bundle.module.url(forResource: name, withExtension: fileExtension))
+        return try String(contentsOf: url, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

@@ -30,7 +30,10 @@ let package = Package(
         ),
         .testTarget(
             name: "TangleCoreTests",
-            dependencies: ["TangleCore"]
+            dependencies: ["TangleCore"],
+            resources: [
+                .process("Fixtures")
+            ]
         )
     ]
 )
