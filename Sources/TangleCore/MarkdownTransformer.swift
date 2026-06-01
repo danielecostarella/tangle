@@ -1,6 +1,6 @@
 import Foundation
 
-public enum MarkdownPreset: String, Sendable, CaseIterable {
+public enum MarkdownPreset: String, Codable, Sendable, CaseIterable {
     case standard
     case llm
 }

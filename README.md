@@ -33,6 +33,16 @@ swift run TangleGUI
 
 The app runs as a menu bar utility and hides its Dock icon at launch.
 
+Current menu bar actions:
+
+- Clean Clipboard
+- Clean URL
+- Convert to Markdown
+- Paste Cleaned Text
+- Convert Table to Markdown, CSV, or TSV
+
+The settings window includes HUD feedback, auto-paste, cleanup mode, Markdown preset, and URL parameter reset controls.
+
 ## CLI
 
 ```sh
@@ -81,13 +91,13 @@ Implemented in this first version:
   - Converts TSV-like and CSV-like copied text to Markdown tables, CSV, or TSV.
   - Escapes quoted CSV values safely.
 
-Still early and intentionally conservative:
+Still needs product hardening:
 
-- Settings persistence
-- Menu bar actions
-- Optional paste-after-transform behavior
 - Global keyboard shortcuts
 - App bundle packaging
+- App icon and menu bar asset
+- Preview/diff window
+- Shortcut customization
 
 ## PDF/Text to LLM Markdown
 

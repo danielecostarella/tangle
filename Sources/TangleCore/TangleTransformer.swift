@@ -27,7 +27,10 @@ public struct TangleTransformer: Sendable {
                 allowedParameters: settings.allowedURLParameters
             ).cleanURLs(in: input)
         case .markdown:
-            return MarkdownTransformer(paragraphPreservation: settings.paragraphPreservation).transform(input)
+            return MarkdownTransformer(
+                preset: settings.markdownPreset,
+                paragraphPreservation: settings.paragraphPreservation
+            ).transform(input)
         case .tableMarkdown:
             return TableConverter().convert(input, to: .markdown)
         case .tableCSV:
