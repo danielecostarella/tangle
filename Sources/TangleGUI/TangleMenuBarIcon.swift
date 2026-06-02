@@ -1,5 +1,6 @@
 import AppKit
 
+@MainActor
 enum TangleMenuBarIcon {
     static let image: NSImage = {
         let size = NSSize(width: 18, height: 18)
