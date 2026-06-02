@@ -29,5 +29,5 @@ jobs:
           files: |
             dist/Tangle.zip
             dist/Tangle.dmg
-          draft: true
-          prerelease: true
+          draft: false
+          prerelease: false
