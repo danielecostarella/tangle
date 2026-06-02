@@ -87,11 +87,11 @@ Copy part of a web page, then choose **Convert to Markdown**.
 Tangle can preserve common browser clipboard structure:
 
 ```markdown
-## Future of Mobility: le soluzioni di domani
+## Market Outlook: next-generation mobility
 
-Il settore **automotive** è in costante evoluzione.
+The **mobility sector** is changing quickly as software, services, and infrastructure converge.
 
-Leggi il [report Deloitte](https://www.deloitte.com/it/it/Industries/automotive/about/automotive-deloitte-automotivesector.html).
+Read the [industry report](https://example.com/reports/mobility-outlook).
 ```
 
 That makes copied web content easier to paste into notes, documentation, prompts, issues, or Markdown editors.
@@ -122,8 +122,8 @@ Before:
 
 ```text
 Company	Segment
-Deloitte	Automotive
-KPMG	Mobility
+Example Research Group	Automotive
+Northstar Analysis	Mobility
 ```
 
 After:
@@ -131,8 +131,8 @@ After:
 ```markdown
 | Company | Segment |
 | --- | --- |
-| Deloitte | Automotive |
-| KPMG | Mobility |
+| Example Research Group | Automotive |
+| Northstar Analysis | Mobility |
 ```
 
 ### Paste Cleanly
