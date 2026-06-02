@@ -29,6 +29,15 @@ final class MarkdownTransformerTests: XCTestCase {
         XCTAssertEqual(output, expected)
     }
 
+    func testDeloitteWebHeadingFixture() throws {
+        let input = try fixture(named: "deloitte-web-input", extension: "txt")
+        let expected = try fixture(named: "deloitte-web-expected", extension: "md")
+
+        let output = MarkdownTransformer(preset: .llm).transform(input)
+
+        XCTAssertEqual(output, expected)
+    }
+
     func testConvertsPdfLikeTextToCompactMarkdown() {
         let input = """
         TANGLE WHITEPAPER
