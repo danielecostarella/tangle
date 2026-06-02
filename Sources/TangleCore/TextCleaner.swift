@@ -33,6 +33,10 @@ public struct TextCleaner: Sendable {
                 return Character(scalar)
             }
 
+            if scalar == "\u{0002}" || scalar == "\u{00AD}" {
+                return "-"
+            }
+
             if scalar.properties.isDefaultIgnorableCodePoint {
                 return nil
             }

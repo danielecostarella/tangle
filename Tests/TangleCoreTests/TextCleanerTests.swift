@@ -16,6 +16,13 @@ final class TextCleanerTests: XCTestCase {
         XCTAssertEqual(output, "Tangle")
     }
 
+    func testPreservesPdfHyphenControlCharacters() {
+        let input = "Software\u{0002}defined vehicles and vehicle\u{00AD}wide data"
+        let output = TextCleaner().clean(input)
+
+        XCTAssertEqual(output, "Software-defined vehicles and vehicle-wide data")
+    }
+
     func testJoinsWrappedParagraphs() {
         let input = """
         This is a sentence
