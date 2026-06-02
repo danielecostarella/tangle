@@ -31,6 +31,10 @@ chmod +x "$RESOURCES_DIR/tangle"
 
 plutil -lint "$CONTENTS_DIR/Info.plist"
 
+codesign --force --sign - "$RESOURCES_DIR/tangle"
+codesign --force --deep --sign - "$APP_DIR"
+codesign --verify --deep --strict --verbose=2 "$APP_DIR"
+
 ditto -c -k --keepParent "$APP_DIR" "$DIST_DIR/Tangle.zip"
 hdiutil create \
   -volname "Tangle" \

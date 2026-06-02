@@ -30,7 +30,13 @@ For the first unsigned preview release:
 3. If macOS blocks the first launch, use System Settings > Privacy & Security > Open Anyway.
 4. Keep Tangle running in the menu bar.
 
-The app is currently unsigned and not notarized. This is expected for `v0.1.0`; signing and notarization are planned later.
+The app is currently ad-hoc signed but not notarized. This is expected for preview releases; Developer ID signing and notarization are planned later.
+
+If macOS says Tangle is damaged, remove the quarantine flag after copying the app to Applications:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Tangle.app
+```
 
 ## First Run
 
