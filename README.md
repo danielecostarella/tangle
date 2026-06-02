@@ -176,6 +176,7 @@ The app runs as a menu bar utility and hides its Dock icon at launch.
 
 Current menu bar actions:
 
+- Quick Transform Picker: `Control` + `Option` + `Command` + `P`
 - Smart Transform
 - Clean Clipboard: `Control` + `Option` + `Command` + `C`
 - Clean URL: `Control` + `Option` + `Command` + `U`
@@ -183,11 +184,15 @@ Current menu bar actions:
 - Paste Cleaned Text: `Control` + `Option` + `Command` + `V`
 - Convert Table to Markdown, CSV, or TSV
 
-The settings window includes HUD feedback, auto-paste, cleanup mode, Markdown preset, preview/diff, shortcut customization, and URL parameter controls.
+The settings window includes HUD feedback, auto-paste, auto-transform on copy, cleanup mode, Markdown preset, preview/diff, shortcut customization, and URL parameter controls.
 
 Clipboard-only shortcuts do not send text anywhere. Auto-paste simulates `Command` + `V` locally and may require macOS Accessibility permission.
 
+Auto-transform on copy is off by default. When enabled, Tangle monitors clipboard changes locally, skips code-like and password-like content, and only transforms when Smart Detect reaches the configured confidence threshold.
+
 Shortcut keys are customizable in Settings. The modifier chord is fixed to `Control` + `Option` + `Command` for this first release.
+
+The Quick Transform Picker shows the current clipboard, a recommended transformation, estimated savings, and a before/after preview before touching the clipboard.
 
 The Preview tab shows before/after clipboard text plus local character and approximate token savings. Token estimates are intentionally rough and never call external services.
 
@@ -245,6 +250,7 @@ Implemented in this first version:
 - Smart Transform
   - Detects URL-heavy, table-like, rich HTML, code-like, Markdown-like, and plain text clipboard content.
   - Routes the clipboard through the best local transformation without calling external services.
+  - Powers the Quick Transform Picker and optional auto-transform on copy mode.
 - Table conversion
   - Converts TSV-like and CSV-like copied text to Markdown tables, CSV, or TSV.
   - Escapes quoted CSV values safely.

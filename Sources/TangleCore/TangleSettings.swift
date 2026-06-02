@@ -1,6 +1,7 @@
 import Foundation
 
 public enum TangleShortcutAction: String, Codable, Sendable, CaseIterable {
+    case quickTransformPicker
     case cleanClipboard
     case cleanURL
     case markdown
@@ -8,6 +9,8 @@ public enum TangleShortcutAction: String, Codable, Sendable, CaseIterable {
 
     public var label: String {
         switch self {
+        case .quickTransformPicker:
+            return "Quick Transform Picker"
         case .cleanClipboard:
             return "Clean Clipboard"
         case .cleanURL:
@@ -38,6 +41,8 @@ public enum TangleShortcutKey: String, Codable, Sendable, CaseIterable {
 public struct TangleSettings: Codable, Equatable, Sendable {
     public var isHUDEnabled: Bool
     public var autoPasteAfterTransform: Bool
+    public var autoTransformOnCopy: Bool
+    public var autoTransformConfidenceThreshold: Double
     public var paragraphPreservation: ParagraphPreservation
     public var markdownPreset: MarkdownPreset
     public var shortcutKeys: [TangleShortcutAction: TangleShortcutKey]
@@ -47,6 +52,8 @@ public struct TangleSettings: Codable, Equatable, Sendable {
     public init(
         isHUDEnabled: Bool = true,
         autoPasteAfterTransform: Bool = false,
+        autoTransformOnCopy: Bool = false,
+        autoTransformConfidenceThreshold: Double = 0.75,
         paragraphPreservation: ParagraphPreservation = .balanced,
         markdownPreset: MarkdownPreset = .llm,
         shortcutKeys: [TangleShortcutAction: TangleShortcutKey] = TangleSettings.defaultShortcutKeys,
@@ -55,6 +62,8 @@ public struct TangleSettings: Codable, Equatable, Sendable {
     ) {
         self.isHUDEnabled = isHUDEnabled
         self.autoPasteAfterTransform = autoPasteAfterTransform
+        self.autoTransformOnCopy = autoTransformOnCopy
+        self.autoTransformConfidenceThreshold = autoTransformConfidenceThreshold
         self.paragraphPreservation = paragraphPreservation
         self.markdownPreset = markdownPreset
         self.shortcutKeys = shortcutKeys
@@ -65,6 +74,8 @@ public struct TangleSettings: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case isHUDEnabled
         case autoPasteAfterTransform
+        case autoTransformOnCopy
+        case autoTransformConfidenceThreshold
         case paragraphPreservation
         case markdownPreset
         case shortcutKeys
@@ -77,6 +88,8 @@ public struct TangleSettings: Codable, Equatable, Sendable {
 
         isHUDEnabled = try container.decodeIfPresent(Bool.self, forKey: .isHUDEnabled) ?? true
         autoPasteAfterTransform = try container.decodeIfPresent(Bool.self, forKey: .autoPasteAfterTransform) ?? false
+        autoTransformOnCopy = try container.decodeIfPresent(Bool.self, forKey: .autoTransformOnCopy) ?? false
+        autoTransformConfidenceThreshold = try container.decodeIfPresent(Double.self, forKey: .autoTransformConfidenceThreshold) ?? 0.75
         paragraphPreservation = try container.decodeIfPresent(ParagraphPreservation.self, forKey: .paragraphPreservation) ?? .balanced
         markdownPreset = try container.decodeIfPresent(MarkdownPreset.self, forKey: .markdownPreset) ?? .llm
         shortcutKeys = try container.decodeIfPresent([TangleShortcutAction: TangleShortcutKey].self, forKey: .shortcutKeys) ?? TangleSettings.defaultShortcutKeys
@@ -85,6 +98,7 @@ public struct TangleSettings: Codable, Equatable, Sendable {
     }
 
     public static let defaultShortcutKeys: [TangleShortcutAction: TangleShortcutKey] = [
+        .quickTransformPicker: .p,
         .cleanClipboard: .c,
         .cleanURL: .u,
         .markdown: .m,

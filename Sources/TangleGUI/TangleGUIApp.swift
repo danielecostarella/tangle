@@ -11,6 +11,13 @@ struct TangleGUIApp: App {
     var body: some Scene {
         MenuBarExtra {
             Button {
+                model.showQuickTransformPicker()
+            } label: {
+                Label("Quick Transform Picker    \(model.shortcutDisplay(for: .quickTransformPicker))", systemImage: "rectangle.and.text.magnifyingglass")
+            }
+            .keyboardShortcut("p")
+
+            Button {
                 model.transformClipboard(.smart, message: "Smart transform complete")
             } label: {
                 Label("Smart Transform", systemImage: "sparkles")
@@ -67,6 +74,14 @@ struct TangleGUIApp: App {
                     .foregroundStyle(.secondary)
             }
 
+            if model.canRestoreOriginalClipboard {
+                Button {
+                    model.restoreOriginalClipboard()
+                } label: {
+                    Label("Restore Original Clipboard", systemImage: "arrow.uturn.backward")
+                }
+            }
+
             SettingsLink {
                 Label("Settings", systemImage: "gearshape")
             }
@@ -100,21 +115,28 @@ final class TangleAppModel: ObservableObject {
         didSet {
             store.save(settings)
             registerShortcuts()
+            configurePasteboardPolling()
         }
     }
 
     @Published var statusMessage = ""
     @Published var lastCharacterSavings: Int?
     @Published var lastPreview: TransformPreview?
+    @Published var canRestoreOriginalClipboard = false
 
     private let clipboard = ClipboardClient()
     private let hud = HUDController()
     private let shortcuts = GlobalShortcutManager()
     private let store = SettingsStore()
+    private let quickTransformPanel = QuickTransformPanelController()
+    private var pasteboardPollTimer: Timer?
+    private var observedPasteboardChangeCount = NSPasteboard.general.changeCount
+    private var originalClipboardBeforeAutoTransform: String?
 
     init() {
         settings = store.load()
         registerShortcuts()
+        configurePasteboardPolling()
     }
 
     func transformClipboard(_ kind: TransformationKind, message: String) {
@@ -139,6 +161,84 @@ final class TangleAppModel: ObservableObject {
             statusMessage = error.localizedDescription
             lastCharacterSavings = nil
 
+            if settings.isHUDEnabled {
+                hud.show(message: statusMessage, isError: true)
+            }
+        }
+    }
+
+    func showQuickTransformPicker() {
+        quickTransformPanel.show(model: self)
+    }
+
+    func quickTransformOptions() throws -> QuickTransformState {
+        let input = try clipboard.readContent()
+        let detection = SmartClipboardDetector().detect(input)
+        let kinds: [TransformationKind] = [
+            .smart,
+            .cleanText,
+            .cleanURL,
+            .markdown,
+            .tableMarkdown,
+            .tableCSV,
+            .tableTSV,
+            .plainPaste
+        ]
+        let options = kinds.map { kind in
+            let output = TangleTransformer(settings: settings).transform(input, kind: kind)
+            return QuickTransformOption(
+                kind: kind,
+                input: input,
+                output: output,
+                isRecommended: kind == detection.recommendedTransformation || (kind == .smart && detection.confidence >= 0.75)
+            )
+        }
+
+        return QuickTransformState(detection: detection, options: options)
+    }
+
+    func applyQuickTransform(_ option: QuickTransformOption) {
+        do {
+            try clipboard.writeText(option.output)
+            observedPasteboardChangeCount = NSPasteboard.general.changeCount
+            lastCharacterSavings = option.stats.characterDelta
+            lastPreview = TransformPreview(kind: option.kind, input: option.input.text, output: option.output)
+            statusMessage = statusText(message: "\(option.kind.displayName) applied", savings: option.stats.characterDelta)
+            quickTransformPanel.close()
+
+            if settings.isHUDEnabled {
+                hud.show(message: statusMessage)
+            }
+
+            if settings.autoPasteAfterTransform {
+                pasteIntoFrontmostApp()
+            }
+        } catch {
+            statusMessage = error.localizedDescription
+            if settings.isHUDEnabled {
+                hud.show(message: statusMessage, isError: true)
+            }
+        }
+    }
+
+    func cancelQuickTransform() {
+        quickTransformPanel.close()
+    }
+
+    func restoreOriginalClipboard() {
+        guard let originalClipboardBeforeAutoTransform else { return }
+
+        do {
+            try clipboard.writeText(originalClipboardBeforeAutoTransform)
+            observedPasteboardChangeCount = NSPasteboard.general.changeCount
+            self.originalClipboardBeforeAutoTransform = nil
+            canRestoreOriginalClipboard = false
+            statusMessage = "Original clipboard restored"
+            if settings.isHUDEnabled {
+                hud.show(message: statusMessage)
+            }
+        } catch {
+            statusMessage = error.localizedDescription
             if settings.isHUDEnabled {
                 hud.show(message: statusMessage, isError: true)
             }
@@ -192,6 +292,8 @@ final class TangleAppModel: ObservableObject {
 
     private func registerShortcuts() {
         shortcuts.register(shortcutKeys: settings.shortcutKeys) {
+            self.showQuickTransformPicker()
+        } cleanClipboard: {
             self.transformClipboard(.cleanText, message: "Clipboard cleaned")
         } cleanURL: {
             self.transformClipboard(.cleanURL, message: "URL tracking removed")
@@ -200,6 +302,68 @@ final class TangleAppModel: ObservableObject {
         } pasteCleanedText: {
             self.transformClipboard(.plainPaste, message: "Plain text ready")
         }
+    }
+
+    private func configurePasteboardPolling() {
+        pasteboardPollTimer?.invalidate()
+        pasteboardPollTimer = nil
+
+        guard settings.autoTransformOnCopy else { return }
+
+        observedPasteboardChangeCount = NSPasteboard.general.changeCount
+        pasteboardPollTimer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.handlePasteboardChangeIfNeeded()
+            }
+        }
+    }
+
+    private func handlePasteboardChangeIfNeeded() {
+        let changeCount = NSPasteboard.general.changeCount
+        guard changeCount != observedPasteboardChangeCount else { return }
+        observedPasteboardChangeCount = changeCount
+
+        guard settings.autoTransformOnCopy,
+              let content = try? clipboard.readContent() else {
+            return
+        }
+
+        let detection = SmartClipboardDetector().detect(content)
+        guard shouldAutoTransform(content: content, detection: detection) else { return }
+
+        let output = TangleTransformer(settings: settings).transform(content, kind: detection.recommendedTransformation)
+        guard output != content.text else { return }
+
+        do {
+            originalClipboardBeforeAutoTransform = content.text
+            canRestoreOriginalClipboard = true
+            try clipboard.writeText(output)
+            observedPasteboardChangeCount = NSPasteboard.general.changeCount
+
+            let stats = TransformationStats(input: content.text, output: output)
+            lastCharacterSavings = stats.characterDelta
+            lastPreview = TransformPreview(kind: detection.recommendedTransformation, input: content.text, output: output)
+            statusMessage = statusText(message: "Auto-transformed \(detection.kind.rawValue)", savings: stats.characterDelta)
+
+            if settings.isHUDEnabled {
+                hud.show(message: statusMessage)
+            }
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    private func shouldAutoTransform(content: ClipboardContent, detection: SmartClipboardDetection) -> Bool {
+        let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.count >= 20,
+              detection.confidence >= settings.autoTransformConfidenceThreshold,
+              detection.kind != .code,
+              !text.looksLikePasswordFragment,
+              !Self.passwordManagerBundleIdentifiers.contains(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "") else {
+            return false
+        }
+
+        return true
     }
 
     private func statusText(message: String, savings: Int) -> String {
@@ -224,6 +388,32 @@ final class TangleAppModel: ObservableObject {
     }
 }
 
+private extension TangleAppModel {
+    static let passwordManagerBundleIdentifiers: Set<String> = [
+        "com.1password.1password",
+        "com.1password.1password7",
+        "com.agilebits.onepassword7",
+        "com.bitwarden.desktop",
+        "com.dashlane.dashlanephonefinal",
+        "com.lastpass.LastPass",
+        "com.getdropbox.DropboxPasswordManager",
+        "com.keepassx.keepassxc"
+    ]
+}
+
+private extension String {
+    var looksLikePasswordFragment: Bool {
+        guard !contains(where: \.isWhitespace),
+              count >= 8,
+              range(of: #"[0-9]"#, options: .regularExpression) != nil,
+              range(of: #"[^A-Za-z0-9]"#, options: .regularExpression) != nil else {
+            return false
+        }
+
+        return true
+    }
+}
+
 struct TransformPreview: Equatable {
     let kind: TransformationKind
     let input: String
@@ -238,6 +428,172 @@ struct TransformPreview: Equatable {
     }
 }
 
+struct QuickTransformState {
+    let detection: SmartClipboardDetection
+    let options: [QuickTransformOption]
+}
+
+struct QuickTransformOption: Identifiable {
+    var id: TransformationKind { kind }
+    let kind: TransformationKind
+    let input: ClipboardContent
+    let output: String
+    let isRecommended: Bool
+    let stats: TransformationStats
+
+    init(kind: TransformationKind, input: ClipboardContent, output: String, isRecommended: Bool) {
+        self.kind = kind
+        self.input = input
+        self.output = output
+        self.isRecommended = isRecommended
+        stats = TransformationStats(input: input.text, output: output)
+    }
+}
+
+@MainActor
+final class QuickTransformPanelController {
+    private var panel: NSPanel?
+
+    func show(model: TangleAppModel) {
+        let view = QuickTransformPickerView(model: model)
+        let hostingController = NSHostingController(rootView: view)
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 820, height: 520),
+            styleMask: [.titled, .closable, .utilityWindow],
+            backing: .buffered,
+            defer: false
+        )
+
+        panel.title = "Tangle Quick Transform"
+        panel.level = .floating
+        panel.center()
+        panel.contentViewController = hostingController
+        panel.isReleasedWhenClosed = false
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        self.panel = panel
+    }
+
+    func close() {
+        panel?.close()
+        panel = nil
+    }
+}
+
+struct QuickTransformPickerView: View {
+    @ObservedObject var model: TangleAppModel
+    @State private var state: QuickTransformState?
+    @State private var selectedKind: TransformationKind = .smart
+    @State private var errorMessage: String?
+
+    private var selectedOption: QuickTransformOption? {
+        state?.options.first { $0.kind == selectedKind }
+            ?? state?.options.first
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            header
+
+            if let errorMessage {
+                ContentUnavailableView("No Clipboard Preview", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let state, let selectedOption {
+                HStack(alignment: .top, spacing: 14) {
+                    optionsList(state.options)
+                        .frame(width: 280)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(optionStatsLine(selectedOption))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 10) {
+                            PreviewTextPane(title: "Before", text: truncated(selectedOption.input.text))
+                            PreviewTextPane(title: "After", text: truncated(selectedOption.output))
+                        }
+                    }
+                }
+
+                HStack {
+                    Spacer()
+
+                    Button("Cancel") {
+                        model.cancelQuickTransform()
+                    }
+                    .keyboardShortcut(.cancelAction)
+
+                    Button("Apply") {
+                        model.applyQuickTransform(selectedOption)
+                    }
+                    .keyboardShortcut(.defaultAction)
+                }
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .padding(18)
+        .frame(minWidth: 820, minHeight: 520)
+        .onAppear(perform: load)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Quick Transform")
+                .font(.title2.weight(.semibold))
+            if let state {
+                Text("Detected \(state.detection.kind.rawValue) · confidence \(state.detection.confidence.formatted(.number.precision(.fractionLength(2))))")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Preview the current clipboard before applying a transformation.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func optionsList(_ options: [QuickTransformOption]) -> some View {
+        List(options, selection: $selectedKind) { option in
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(option.kind.displayName)
+                        .font(.headline)
+                    if option.isRecommended {
+                        Text("recommended")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Text(optionStatsLine(option))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .tag(option.kind)
+        }
+    }
+
+    private func load() {
+        do {
+            let state = try model.quickTransformOptions()
+            self.state = state
+            selectedKind = state.options.first(where: \.isRecommended)?.kind ?? state.options.first?.kind ?? .smart
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func optionStatsLine(_ option: QuickTransformOption) -> String {
+        let charWord = option.stats.characterDelta >= 0 ? "saved" : "added"
+        let tokenWord = option.stats.estimatedTokenDelta >= 0 ? "saved" : "added"
+        return "\(abs(option.stats.characterDelta)) chars \(charWord) · ~\(abs(option.stats.estimatedTokenDelta)) tokens \(tokenWord)"
+    }
+
+    private func truncated(_ text: String) -> String {
+        guard text.count > 5_000 else { return text }
+        return String(text.prefix(5_000)) + "\n\n[Preview truncated]"
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var model: TangleAppModel
 
@@ -247,9 +603,28 @@ struct SettingsView: View {
                 Section("Behavior") {
                     Toggle("HUD", isOn: $model.settings.isHUDEnabled)
                     Toggle("Auto-paste", isOn: $model.settings.autoPasteAfterTransform)
+                    Toggle("Auto-transform on copy", isOn: $model.settings.autoTransformOnCopy)
 
                     if model.settings.autoPasteAfterTransform {
                         AccessibilityPermissionView(model: model)
+                    }
+
+                    if model.settings.autoTransformOnCopy {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Slider(
+                                value: $model.settings.autoTransformConfidenceThreshold,
+                                in: 0.75...0.95,
+                                step: 0.05
+                            )
+
+                            Text("Silent mode runs only when Tangle is confident, skips code-like and password-like clipboard content, and can restore the original clipboard from the menu.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            Text("Confidence: \(model.settings.autoTransformConfidenceThreshold.formatted(.number.precision(.fractionLength(2))))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
@@ -272,6 +647,7 @@ struct SettingsView: View {
                 }
 
                 Section("Global Shortcuts") {
+                    ShortcutPicker(action: .quickTransformPicker, model: model)
                     ShortcutPicker(action: .cleanClipboard, model: model)
                     ShortcutPicker(action: .cleanURL, model: model)
                     ShortcutPicker(action: .markdown, model: model)

@@ -3,13 +3,16 @@ import Foundation
 import TangleCore
 
 private enum GlobalShortcutID: UInt32, CaseIterable {
-    case cleanClipboard = 1
-    case cleanURL = 2
-    case markdown = 3
-    case pasteCleanedText = 4
+    case quickTransformPicker = 1
+    case cleanClipboard = 2
+    case cleanURL = 3
+    case markdown = 4
+    case pasteCleanedText = 5
 
     init(action: TangleShortcutAction) {
         switch action {
+        case .quickTransformPicker:
+            self = .quickTransformPicker
         case .cleanClipboard:
             self = .cleanClipboard
         case .cleanURL:
@@ -36,6 +39,7 @@ final class GlobalShortcutManager {
 
     func register(
         shortcutKeys: [TangleShortcutAction: TangleShortcutKey],
+        quickTransformPicker: @escaping @MainActor () -> Void,
         cleanClipboard: @escaping @MainActor () -> Void,
         cleanURL: @escaping @MainActor () -> Void,
         markdown: @escaping @MainActor () -> Void,
@@ -45,6 +49,7 @@ final class GlobalShortcutManager {
         ShortcutActionStore.shared.removeAll()
 
         let actions: [(TangleShortcutAction, @MainActor () -> Void)] = [
+            (.quickTransformPicker, quickTransformPicker),
             (.cleanClipboard, cleanClipboard),
             (.cleanURL, cleanURL),
             (.markdown, markdown),
