@@ -11,7 +11,7 @@ It sits in the menu bar, reads the current text clipboard, applies predictable l
 - `TangleCore`: local transformation logic, clipboard access, and settings persistence.
 - `TangleGUI`: native SwiftUI menu bar app.
 - `tangle`: command-line interface for scripting and automation.
-- 41 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, and table formatting.
+- 45 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, and table formatting.
 
 ## Requirements
 
@@ -228,6 +228,7 @@ Implemented in this first version:
   - Collapses repeated blank lines.
   - Joins common wrapped paragraph text.
   - Repairs common PDF hyphenated line breaks.
+  - Preserves basic email structure such as forwarded headers and signature separators.
   - Removes repeated short header/footer noise after the first occurrence.
 - Clean URL
   - Removes common tracking parameters such as `utm_*`, `fbclid`, `gclid`, `mc_cid`, and `mc_eid`.

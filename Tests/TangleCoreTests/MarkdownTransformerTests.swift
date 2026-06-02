@@ -38,6 +38,24 @@ final class MarkdownTransformerTests: XCTestCase {
         XCTAssertEqual(output, expected)
     }
 
+    func testMarkdownTransformIsIdempotentForFixtures() throws {
+        let fixtureNames = [
+            "pdf-report-input",
+            "web-article-input",
+            "kpmg-sdv-input",
+            "deloitte-web-input"
+        ]
+        let transformer = MarkdownTransformer(preset: .llm)
+
+        for fixtureName in fixtureNames {
+            let input = try fixture(named: fixtureName, extension: "txt")
+            let first = transformer.transform(input)
+            let second = transformer.transform(first)
+
+            XCTAssertEqual(first, second, "Expected \(fixtureName) to be idempotent")
+        }
+    }
+
     func testConvertsBrowserHTMLToMarkdown() {
         let html = """
         <html>

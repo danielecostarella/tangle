@@ -84,4 +84,71 @@ final class TextCleanerTests: XCTestCase {
         Second paragraph.
         """)
     }
+
+    func testAggressiveModePreservesColonAndSemicolonBoundaries() {
+        let input = """
+        Use the following setup:
+        install the helper package
+        before running the script.
+
+        The migration has two phases;
+        first export the data
+        then import it locally.
+        """
+
+        let output = TextCleaner(paragraphPreservation: .aggressive).clean(input)
+
+        XCTAssertEqual(output, """
+        Use the following setup:
+        install the helper package before running the script.
+
+        The migration has two phases;
+        first export the data then import it locally.
+        """)
+    }
+
+    func testConservativeModeAlwaysJoinsWrappedParagraphLines() {
+        let input = """
+        The setup is complete.
+        Start the next step
+        from the local app.
+        """
+
+        let output = TextCleaner(paragraphPreservation: .conservative).clean(input)
+
+        XCTAssertEqual(output, "The setup is complete. Start the next step from the local app.")
+    }
+
+    func testPreservesBasicEmailStructure() {
+        let input = """
+        ---------- Forwarded message ---------
+        From: Alex Example <alex@example.com>
+        Date: Mon, 1 Jun 2026 09:14
+        Subject: Q2 Report
+        To: team@example.com
+
+        Body text
+        copied from an email.
+
+        --
+        Alex Example | Analyst
+        example.com
+        """
+
+        let output = TextCleaner(paragraphPreservation: .balanced).clean(input)
+
+        XCTAssertEqual(output, """
+        ---------- Forwarded message ---------
+        From: Alex Example <alex@example.com>
+        Date: Mon, 1 Jun 2026 09:14
+        Subject: Q2 Report
+        To: team@example.com
+
+        Body text copied from an email.
+
+        --
+
+        Alex Example | Analyst example.com
+        """)
+    }
 }

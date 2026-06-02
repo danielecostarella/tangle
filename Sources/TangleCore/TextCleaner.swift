@@ -93,20 +93,33 @@ public struct TextCleaner: Sendable {
         var paragraphs: [[String]] = []
         var current: [String] = []
 
+        func flushCurrent() {
+            if !current.isEmpty {
+                paragraphs.append(current)
+                current.removeAll(keepingCapacity: true)
+            }
+        }
+
         for line in lines {
             if line.isEmpty {
-                if !current.isEmpty {
-                    paragraphs.append(current)
-                    current.removeAll(keepingCapacity: true)
+                flushCurrent()
+            } else if line.isEmailHeaderLine {
+                flushCurrent()
+                if let last = paragraphs.indices.last,
+                   paragraphs[last].allSatisfy(\.isEmailHeaderLine) {
+                    paragraphs[last].append(line)
+                } else {
+                    paragraphs.append([line])
                 }
+            } else if line.isEmailSignatureSeparator {
+                flushCurrent()
+                paragraphs.append([line])
             } else {
                 current.append(line)
             }
         }
 
-        if !current.isEmpty {
-            paragraphs.append(current)
-        }
+        flushCurrent()
 
         return paragraphs
     }
@@ -140,6 +153,8 @@ public struct TextCleaner: Sendable {
             || line.range(of: #"^[-*+]\s+"#, options: .regularExpression) != nil
             || line.range(of: #"^[•·▪‣–—]\s+"#, options: .regularExpression) != nil
             || line.range(of: #"^\d+[\.)]\s+"#, options: .regularExpression) != nil
+            || line.isEmailHeaderLine
+            || line.isEmailSignatureSeparator
             || line.looksLikeAllCapsHeading
     }
 
@@ -205,5 +220,14 @@ private extension String {
             && uppercased() == self
             && range(of: #"[A-ZÀ-ÖØ-Þ]"#, options: .regularExpression) != nil
             && range(of: #"^\d+$"#, options: .regularExpression) == nil
+    }
+
+    var isEmailHeaderLine: Bool {
+        range(of: #"^-{2,}\s*(Forwarded|Original) message\s*-{2,}$"#, options: [.regularExpression, .caseInsensitive]) != nil
+            || range(of: #"^(From|Date|Subject|To|Cc|Bcc|Reply-To):\s*.+"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    var isEmailSignatureSeparator: Bool {
+        trimmingCharacters(in: .whitespaces) == "--"
     }
 }
