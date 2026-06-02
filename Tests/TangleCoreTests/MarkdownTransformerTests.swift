@@ -71,6 +71,67 @@ final class MarkdownTransformerTests: XCTestCase {
         """)
     }
 
+    func testConvertsHTMLCodeBlocksTablesListsAndQuotes() {
+        let html = """
+        <article>
+          <p>Don&rsquo;t lose <code>inline</code> code &mdash; keep it useful.</p>
+          <pre><code>const value = 42;
+        console.log(value);</code></pre>
+          <ol>
+            <li>Install the package<ul><li>Use the stable channel</li></ul></li>
+            <li>Run the command</li>
+          </ol>
+          <blockquote><p>This is quoted text.</p></blockquote>
+          <table>
+            <tr><th>Token</th><th>Count</th></tr>
+            <tr><td>word</td><td>42</td></tr>
+          </table>
+        </article>
+        """
+
+        let output = MarkdownTransformer(preset: .llm).transform(
+            html: html,
+            fallbackText: ""
+        )
+
+        XCTAssertEqual(output, """
+        Don’t lose `inline` code — keep it useful.
+
+        ```
+        const value = 42;
+        console.log(value);
+        ```
+
+        1. Install the package
+          - Use the stable channel
+        2. Run the command
+
+        > This is quoted text.
+
+        | Token | Count |
+        | --- | --- |
+        | word | 42 |
+        """)
+    }
+
+    func testStandardHTMLPresetPreservesReadableMarkdown() {
+        let html = """
+        <h2>Setup</h2>
+        <p>Use <strong>local</strong> transforms.</p>
+        """
+
+        let output = MarkdownTransformer(preset: .standard).transform(
+            html: html,
+            fallbackText: ""
+        )
+
+        XCTAssertEqual(output, """
+        ## Setup
+
+        Use **local** transforms.
+        """)
+    }
+
     func testFallsBackToPlainTextWhenHTMLHasNoContent() {
         let output = MarkdownTransformer(preset: .llm).transform(
             html: "<script>ignored()</script>",
@@ -81,6 +142,74 @@ final class MarkdownTransformerTests: XCTestCase {
         ## Tangle Notes
 
         Clipboard text
+        """)
+    }
+
+    func testColonIntroLinesDoNotBecomeHeadingsInsideFlowingText() {
+        let input = """
+        Some context line without sentence ending
+
+        Install the package using npm:
+
+        npm install something
+
+        Or using yarn:
+
+        yarn add something
+        """
+
+        let output = MarkdownTransformer(preset: .llm).transform(input)
+
+        XCTAssertEqual(output, """
+        Some context line without sentence ending
+
+        Install the package using npm:
+
+        npm install something
+
+        Or using yarn:
+
+        yarn add something
+        """)
+    }
+
+    func testEllipsisPreventsWebHeadingFalsePositive() {
+        let input = """
+        The cost is €99 or £85 per month…
+
+        Next sentence continues here.
+        """
+
+        let output = MarkdownTransformer(preset: .llm).transform(input)
+
+        XCTAssertEqual(output, """
+        The cost is €99 or £85 per month…
+
+        Next sentence continues here.
+        """)
+    }
+
+    func testWeakContinuationWordsDoNotBecomeHeadings() {
+        let input = """
+        This option is better than
+
+        the previous implementation.
+
+        We should avoid this because
+
+        the result is incomplete.
+        """
+
+        let output = MarkdownTransformer(preset: .llm).transform(input)
+
+        XCTAssertEqual(output, """
+        This option is better than
+
+        the previous implementation.
+
+        We should avoid this because
+
+        the result is incomplete.
         """)
     }
 

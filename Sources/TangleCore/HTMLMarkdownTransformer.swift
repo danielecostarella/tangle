@@ -1,4 +1,5 @@
 import Foundation
+import SwiftSoup
 
 public struct HTMLMarkdownTransformer: Sendable {
     public var preset: MarkdownPreset
@@ -13,7 +14,7 @@ public struct HTMLMarkdownTransformer: Sendable {
     }
 
     public func transform(html: String, fallbackText: String) -> String {
-        let markdown = convert(html)
+        let markdown = (try? DOMMarkdownRenderer().render(html)) ?? ""
         guard !markdown.isEmpty else {
             return MarkdownTransformer(
                 preset: preset,
@@ -28,41 +29,6 @@ public struct HTMLMarkdownTransformer: Sendable {
             return markdown.compactedMarkdown
         }
     }
-
-    private func convert(_ html: String) -> String {
-        var document = html
-            .replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
-            .removingMatches(for: #"(?is)<!--.*?-->"#)
-            .removingMatches(for: #"(?is)<(script|style|noscript|svg)\b[^>]*>.*?</\1>"#)
-
-        document = document.replacingMatches(for: #"(?is)<h([1-6])\b[^>]*>(.*?)</h\1>"#) { match in
-            guard let level = Int(match.group(1)) else { return "" }
-            let text = match.group(2).inlineMarkdown
-            guard !text.isEmpty else { return "" }
-            return "\n\n" + String(repeating: "#", count: level) + " " + text + "\n\n"
-        }
-
-        document = document.replacingMatches(for: #"(?is)<li\b[^>]*>(.*?)</li>"#) { match in
-            let text = match.group(1).inlineMarkdown
-            return text.isEmpty ? "\n" : "\n- \(text)\n"
-        }
-
-        document = document
-            .replacingOccurrences(of: #"(?i)<br\s*/?>"#, with: "\n", options: .regularExpression)
-            .replacingOccurrences(
-                of: #"(?i)</?(p|div|section|article|main|header|footer|aside|blockquote|ul|ol|table|tr|td|th)\b[^>]*>"#,
-                with: "\n\n",
-                options: .regularExpression
-            )
-
-        let lines = document
-            .components(separatedBy: "\n")
-            .map { $0.inlineMarkdown }
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-
-        return lines.collapsingMarkdownBlankLines()
-    }
 }
 
 public extension MarkdownTransformer {
@@ -74,152 +40,247 @@ public extension MarkdownTransformer {
     }
 }
 
-private extension String {
-    var inlineMarkdown: String {
-        var text = self
+private struct DOMMarkdownRenderer {
+    func render(_ html: String) throws -> String {
+        let document = try SwiftSoup.parse(html)
+        try document.select("script, style, noscript, svg").remove()
 
-        text = text.replacingMatches(for: #"(?is)<a\b([^>]*)>(.*?)</a>"#) { match in
-            let attributes = match.group(1)
-            let label = match.group(2).inlineMarkdown
-            guard let url = attributes.htmlAttribute(named: "href")?.decodedHTMLEntities,
-                  !url.isEmpty,
-                  !label.isEmpty else {
-                return label
-            }
+        let root: Element = document.body() ?? document
+        return try renderChildren(of: root)
+            .compactedMarkdown
+    }
 
-            let cleanedURL = URLCleaner().cleanURLs(in: url)
-            if label == cleanedURL {
-                return cleanedURL
-            }
+    private func renderChildren(of node: Node) throws -> String {
+        try node.childNodesCopy()
+            .map(renderBlockNode)
+            .joined(separator: "\n")
+            .compactedMarkdown
+    }
 
-            return "[\(label)](\(cleanedURL.escapedMarkdownURL))"
+    private func renderBlockNode(_ node: Node) throws -> String {
+        if let text = node as? TextNode {
+            return normalizeInlineWhitespace(text.getWholeText())
         }
 
-        text = text.replacingMatches(for: #"(?is)<(strong|b)\b[^>]*>(.*?)</\1>"#) { match in
-            let content = match.group(2).inlineMarkdown
-            return content.isEmpty ? "" : "**\(content)**"
+        guard let element = node as? Element else { return "" }
+        let tag = element.tagNameNormal()
+
+        switch tag {
+        case "html", "body":
+            return try renderChildren(of: element)
+        case "h1", "h2", "h3", "h4", "h5", "h6":
+            let level = Int(tag.dropFirst()) ?? 2
+            let text = try renderInlineChildren(of: element)
+            return text.isEmpty ? "" : "\n\n" + String(repeating: "#", count: level) + " " + text + "\n\n"
+        case "p":
+            return try block(renderInlineChildren(of: element))
+        case "div", "section", "article", "main", "header", "footer", "aside":
+            return try block(renderChildren(of: element))
+        case "br":
+            return "\n"
+        case "pre":
+            return try renderCodeBlock(element)
+        case "ul":
+            return try renderList(element, ordered: false, depth: 0)
+        case "ol":
+            return try renderList(element, ordered: true, depth: 0)
+        case "blockquote":
+            return try renderBlockquote(element)
+        case "table":
+            return try renderTable(element)
+        case "hr":
+            return "\n\n---\n\n"
+        default:
+            return try renderInlineNode(element)
+        }
+    }
+
+    private func renderInlineChildren(of node: Node) throws -> String {
+        try node.childNodesCopy()
+            .map(renderInlineNode)
+            .joined()
+            .normalizedInlineMarkdown
+    }
+
+    private func renderInlineNode(_ node: Node) throws -> String {
+        if let text = node as? TextNode {
+            return normalizeInlineWhitespace(text.getWholeText())
         }
 
-        text = text.replacingMatches(for: #"(?is)<(em|i)\b[^>]*>(.*?)</\1>"#) { match in
-            let content = match.group(2).inlineMarkdown
-            return content.isEmpty ? "" : "*\(content)*"
-        }
+        guard let element = node as? Element else { return "" }
+        let tag = element.tagNameNormal()
 
-        return text
-            .replacingOccurrences(of: #"(?is)<[^>]+>"#, with: " ", options: .regularExpression)
-            .decodedHTMLEntities
-            .replacingOccurrences(of: #"[ \t\n]+"#, with: " ", options: .regularExpression)
+        switch tag {
+        case "br":
+            return "\n"
+        case "strong", "b":
+            return try wrapInline(element, marker: "**")
+        case "em", "i":
+            return try wrapInline(element, marker: "*")
+        case "a":
+            return try renderLink(element)
+        case "code", "kbd", "samp":
+            return try renderInlineCode(element)
+        case "img":
+            let alt = try element.attr("alt").trimmingCharacters(in: .whitespacesAndNewlines)
+            return alt.isEmpty ? "" : alt
+        case "script", "style", "noscript", "svg":
+            return ""
+        default:
+            return try renderInlineChildren(of: element)
+        }
+    }
+
+    private func wrapInline(_ element: Element, marker: String) throws -> String {
+        let content = try renderInlineChildren(of: element)
+        return content.isEmpty ? "" : marker + content + marker
+    }
+
+    private func renderLink(_ element: Element) throws -> String {
+        let label = try renderInlineChildren(of: element)
+        let href = try element.attr("href")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !label.isEmpty, !href.isEmpty else { return label }
+
+        let cleanedURL = URLCleaner().cleanURLs(in: href)
+        if label == cleanedURL {
+            return cleanedURL
+        }
+
+        return "[\(label)](\(cleanedURL.escapedMarkdownURL))"
     }
 
-    func removingMatches(for pattern: String) -> String {
-        replacingOccurrences(of: pattern, with: "", options: .regularExpression)
+    private func renderInlineCode(_ element: Element) throws -> String {
+        let content = try element.text(trimAndNormaliseWhitespace: false)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !content.isEmpty else { return "" }
+
+        let marker = content.contains("`") ? "``" : "`"
+        return marker + content + marker
     }
 
-    func replacingMatches(for pattern: String, transform: (RegexMatch) -> String) -> String {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return self }
+    private func renderCodeBlock(_ element: Element) throws -> String {
+        let codeElement = try element.select("code").first()
+        let content = try (codeElement ?? element)
+            .text(trimAndNormaliseWhitespace: false)
+            .trimmingCharacters(in: .newlines)
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return ""
+        }
 
-        let nsString = self as NSString
-        let matches = regex.matches(in: self, range: NSRange(location: 0, length: nsString.length)).reversed()
-        var output = self
+        return "\n\n```\n\(content)\n```\n\n"
+    }
 
-        for match in matches {
-            let replacement = transform(RegexMatch(match: match, source: nsString))
-            if let range = Range(match.range, in: output) {
-                output.replaceSubrange(range, with: replacement)
+    private func renderList(_ element: Element, ordered: Bool, depth: Int) throws -> String {
+        var lines: [String] = []
+        var index = 1
+
+        for child in element.children().array() where child.tagNameNormal() == "li" {
+            let item = try renderListItem(child, ordered: ordered, index: index, depth: depth)
+            if !item.isEmpty {
+                lines.append(item)
             }
+            index += 1
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private func renderListItem(_ element: Element, ordered: Bool, index: Int, depth: Int) throws -> String {
+        var inlineParts: [String] = []
+        var nestedLists: [String] = []
+
+        for child in element.childNodesCopy() {
+            if let childElement = child as? Element {
+                switch childElement.tagNameNormal() {
+                case "ul":
+                    nestedLists.append(try renderList(childElement, ordered: false, depth: depth + 1))
+                    continue
+                case "ol":
+                    nestedLists.append(try renderList(childElement, ordered: true, depth: depth + 1))
+                    continue
+                case "p":
+                    inlineParts.append(try renderInlineChildren(of: childElement))
+                    continue
+                default:
+                    break
+                }
+            }
+
+            inlineParts.append(try renderInlineNode(child))
+        }
+
+        let text = inlineParts.joined(separator: " ").normalizedInlineMarkdown
+        let indent = String(repeating: "  ", count: depth)
+        let marker = ordered ? "\(index)." : "-"
+        var output = text.isEmpty ? "" : "\(indent)\(marker) \(text)"
+
+        let nested = nestedLists
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+        if !nested.isEmpty {
+            output += output.isEmpty ? nested : "\n" + nested
         }
 
         return output
     }
 
-    func htmlAttribute(named name: String) -> String? {
-        let pattern = #"(?i)\b\#(NSRegularExpression.escapedPattern(for: name))\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
-        let nsString = self as NSString
-        guard let match = regex.firstMatch(in: self, range: NSRange(location: 0, length: nsString.length)) else {
-            return nil
-        }
+    private func renderBlockquote(_ element: Element) throws -> String {
+        let content = try renderChildren(of: element)
+            .compactedMarkdown
+        guard !content.isEmpty else { return "" }
 
-        for index in 1..<match.numberOfRanges {
-            let range = match.range(at: index)
-            if range.location != NSNotFound {
-                return nsString.substring(with: range)
-            }
-        }
-
-        return nil
+        let quoted = content
+            .components(separatedBy: "\n")
+            .map { line in line.isEmpty ? ">" : "> " + line }
+            .joined(separator: "\n")
+        return "\n\n\(quoted)\n\n"
     }
 
-    var decodedHTMLEntities: String {
-        var text = replacingOccurrences(of: "&nbsp;", with: " ")
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&lt;", with: "<")
-            .replacingOccurrences(of: "&gt;", with: ">")
-            .replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&#39;", with: "'")
-            .replacingOccurrences(of: "&apos;", with: "'")
-
-        text = text.replacingMatches(for: #"&#(\d+);"#) { match in
-            guard let value = UInt32(match.group(1)),
-                  let scalar = UnicodeScalar(value) else {
-                return match.group(0)
+    private func renderTable(_ element: Element) throws -> String {
+        let rows = try element.select("tr").array().compactMap { row -> [String]? in
+            let cells = try row.select("th, td").array().map { cell in
+                try renderInlineChildren(of: cell)
             }
-            return String(Character(scalar))
+            return cells.isEmpty ? nil : cells
         }
+        guard !rows.isEmpty else { return "" }
 
-        text = text.replacingMatches(for: #"&#x([0-9a-fA-F]+);"#) { match in
-            guard let value = UInt32(match.group(1), radix: 16),
-                  let scalar = UnicodeScalar(value) else {
-                return match.group(0)
-            }
-            return String(Character(scalar))
+        let width = rows.map(\.count).max() ?? 0
+        let normalizedRows = rows.map { row in
+            row + Array(repeating: "", count: max(0, width - row.count))
         }
-
-        return text
+        let tsv = normalizedRows
+            .map { $0.joined(separator: "\t") }
+            .joined(separator: "\n")
+        return "\n\n" + TableConverter().convert(tsv, to: .markdown) + "\n\n"
     }
 
+    private func block(_ content: String) -> String {
+        let text = content.compactedMarkdown
+        return text.isEmpty ? "" : "\n\n\(text)\n\n"
+    }
+
+    private func normalizeInlineWhitespace(_ text: String) -> String {
+        text.replacingOccurrences(of: #"[ \t\n]+"#, with: " ", options: .regularExpression)
+    }
+}
+
+private extension String {
     var escapedMarkdownURL: String {
         replacingOccurrences(of: ")", with: "%29")
             .replacingOccurrences(of: " ", with: "%20")
+    }
+
+    var normalizedInlineMarkdown: String {
+        replacingOccurrences(of: #"[ \t]+"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #" ?\n ?"#, with: "\n", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var compactedMarkdown: String {
         replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
             .replacingOccurrences(of: #"[ \t]+\n"#, with: "\n", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-}
-
-private extension Array where Element == String {
-    func collapsingMarkdownBlankLines() -> String {
-        var output: [String] = []
-        var previousWasBlank = false
-
-        for line in self {
-            let isBlank = line.isEmpty
-            if isBlank && previousWasBlank {
-                continue
-            }
-
-            output.append(line)
-            previousWasBlank = isBlank
-        }
-
-        return output
-            .joined(separator: "\n")
-            .compactedMarkdown
-    }
-}
-
-private struct RegexMatch {
-    var match: NSTextCheckingResult
-    var source: NSString
-
-    func group(_ index: Int) -> String {
-        guard index < match.numberOfRanges else { return "" }
-        let range = match.range(at: index)
-        guard range.location != NSNotFound else { return "" }
-        return source.substring(with: range)
     }
 }

@@ -11,7 +11,7 @@ It sits in the menu bar, reads the current text clipboard, applies predictable l
 - `TangleCore`: local transformation logic, clipboard access, and settings persistence.
 - `TangleGUI`: native SwiftUI menu bar app.
 - `tangle`: command-line interface for scripting and automation.
-- 31 unit tests covering text cleanup, URL cleaning, Markdown conversion, and table formatting.
+- 41 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, and table formatting.
 
 ## Requirements
 
@@ -176,6 +176,7 @@ The app runs as a menu bar utility and hides its Dock icon at launch.
 
 Current menu bar actions:
 
+- Smart Transform
 - Clean Clipboard: `Control` + `Option` + `Command` + `C`
 - Clean URL: `Control` + `Option` + `Command` + `U`
 - Convert to Markdown: `Control` + `Option` + `Command` + `M`
@@ -193,6 +194,9 @@ The Preview tab shows before/after clipboard text plus local character and appro
 ## CLI
 
 ```sh
+swift run tangle smart
+swift run tangle smart --stats
+swift run tangle detect
 swift run tangle clean
 swift run tangle clean --mode aggressive --stats
 swift run tangle clean --clipboard
@@ -231,11 +235,15 @@ Implemented in this first version:
   - Supports multiple URLs in copied text.
 - Markdown
   - Converts PDF/web text into conservative Markdown.
-  - Reads browser clipboard HTML when available to preserve headings, links, bold, italic, and lists.
+  - Reads browser clipboard HTML when available to preserve headings, links, bold, italic, lists, quotes, code blocks, and tables.
+  - Uses SwiftSoup for DOM-based HTML parsing instead of regex-only conversion.
   - Cleans tracking parameters from links converted out of HTML.
   - Normalizes bullet characters.
   - Converts underline headings and obvious all-caps headings.
   - Includes an `llm` preset for compact, token-conscious output.
+- Smart Transform
+  - Detects URL-heavy, table-like, rich HTML, code-like, Markdown-like, and plain text clipboard content.
+  - Routes the clipboard through the best local transformation without calling external services.
 - Table conversion
   - Converts TSV-like and CSV-like copied text to Markdown tables, CSV, or TSV.
   - Escapes quoted CSV values safely.

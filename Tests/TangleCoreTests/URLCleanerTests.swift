@@ -37,4 +37,11 @@ final class URLCleanerTests: XCTestCase {
 
         XCTAssertEqual(output, "https://example.com/?q=tangle")
     }
+
+    func testRemovesPublisherAndShareTrackers() {
+        let input = "https://example.com/?ref_url=https%3A%2F%2Fsocial.example&smid=url-share&taid=abc&taboola_id=def&id=42"
+        let output = URLCleaner().cleanURLs(in: input)
+
+        XCTAssertEqual(output, "https://example.com/?id=42")
+    }
 }

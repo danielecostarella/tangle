@@ -203,7 +203,8 @@ private extension String {
               next?.isEmpty == false,
               line.range(of: #"[A-Za-zÀ-ÖØ-öø-ÿ]"#, options: .regularExpression) != nil,
               line.range(of: #"https?://"#, options: .regularExpression) == nil,
-              line.range(of: #"[.!?]$"#, options: .regularExpression) == nil,
+              !line.endsWithSentenceTerminator,
+              !(next?.hasSuffix(":") ?? false),
               next?.range(of: #"^(=|-){3,}$"#, options: .regularExpression) == nil,
               !line.looksLikePlainHeading,
               !line.hasWeakContinuationEnding,
@@ -218,10 +219,13 @@ private extension String {
         }
 
         if line.contains(":") {
+            if let previous, !previous.endsWithSentenceTerminator, !previous.isEmpty {
+                return false
+            }
             return line.first?.isUppercase == true
         }
 
-        if let previous, previous.range(of: #"[.!?]$"#, options: .regularExpression) == nil, !previous.isEmpty {
+        if let previous, !previous.endsWithSentenceTerminator, !previous.isEmpty {
             return false
         }
 
@@ -236,12 +240,17 @@ private extension String {
             .trimmingCharacters(in: .punctuationCharacters)
             .lowercased()
         let weakEndings: Set<String> = [
-            "a", "an", "and", "as", "at", "by", "for", "from", "in", "of", "on", "or", "the", "to", "with",
+            "a", "an", "and", "as", "at", "because", "by", "for", "from", "if", "in", "of", "on", "or",
+            "since", "than", "the", "though", "to", "unless", "while", "with",
             "da", "del", "della", "delle", "dei", "degli", "di", "e", "gli", "i", "il", "in", "la", "le",
             "lo", "o", "per", "su", "tra", "un", "una"
         ]
 
         return weakEndings.contains(word)
+    }
+
+    var endsWithSentenceTerminator: Bool {
+        range(of: #"[.!?…]$"#, options: .regularExpression) != nil
     }
 
     var capitalizedHeading: String {

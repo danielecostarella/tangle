@@ -1,6 +1,7 @@
 import Foundation
 
 public enum TransformationKind: String, Sendable, CaseIterable {
+    case smart
     case cleanText
     case cleanURL
     case markdown
@@ -18,6 +19,10 @@ public struct TangleTransformer: Sendable {
     }
 
     public func transform(_ input: ClipboardContent, kind: TransformationKind) -> String {
+        if case .smart = kind {
+            return transform(input, kind: SmartClipboardDetector().detect(input).recommendedTransformation)
+        }
+
         if case .markdown = kind, let html = input.html?.nonEmptyHTML {
             return MarkdownTransformer(
                 preset: settings.markdownPreset,
@@ -29,7 +34,14 @@ public struct TangleTransformer: Sendable {
     }
 
     public func transform(_ input: String, kind: TransformationKind) -> String {
+        if case .smart = kind {
+            let content = ClipboardContent(text: input)
+            return transform(content, kind: SmartClipboardDetector().detect(content).recommendedTransformation)
+        }
+
         switch kind {
+        case .smart:
+            return transform(input, kind: .cleanText)
         case .cleanText, .plainPaste:
             return TextCleaner(paragraphPreservation: settings.paragraphPreservation).clean(input)
         case .cleanURL:

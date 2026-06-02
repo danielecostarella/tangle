@@ -9,6 +9,8 @@ struct TangleCLI: ParsableCommand {
         commandName: "tangle",
         abstract: "A local-first clipboard and text transformer for macOS.",
         subcommands: [
+            Smart.self,
+            Detect.self,
             Clean.self,
             CleanURL.self,
             Markdown.self,
@@ -16,6 +18,49 @@ struct TangleCLI: ParsableCommand {
         ],
         defaultSubcommand: Clean.self
     )
+}
+
+struct Smart: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "smart",
+        abstract: "Detect clipboard or stdin content and apply the best local transformation."
+    )
+
+    @Flag(help: "Read from and write back to the macOS clipboard.")
+    var clipboard = false
+
+    @Flag(help: "Print detected content kind and character savings to stderr.")
+    var stats = false
+
+    func run() throws {
+        let content = try Input.readContent(useClipboard: clipboard)
+        let detection = SmartClipboardDetector().detect(content)
+        let output = TangleTransformer().transform(content, kind: .smart)
+
+        if stats {
+            let message = "detected: \(detection.kind.rawValue), confidence: \(String(format: "%.2f", detection.confidence))\n"
+            FileHandle.standardError.write(Data(message.utf8))
+            Output.writeStats(input: content.text, output: output)
+        }
+
+        try Output.write(output, useClipboard: clipboard)
+    }
+}
+
+struct Detect: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "detect",
+        abstract: "Print the detected clipboard or stdin content type."
+    )
+
+    @Flag(help: "Read from the macOS clipboard.")
+    var clipboard = false
+
+    func run() throws {
+        let content = try Input.readContent(useClipboard: clipboard)
+        let detection = SmartClipboardDetector().detect(content)
+        print("\(detection.kind.rawValue)\t\(detection.recommendedTransformation.rawValue)\t\(String(format: "%.2f", detection.confidence))")
+    }
 }
 
 struct Clean: ParsableCommand {
@@ -179,6 +224,14 @@ enum TableFormatOption: String, ExpressibleByArgument {
 }
 
 enum Input {
+    static func readContent(useClipboard: Bool) throws -> ClipboardContent {
+        if useClipboard || isatty(STDIN_FILENO) != 0 {
+            return try ClipboardClient().readContent()
+        }
+
+        return ClipboardContent(text: FileHandle.standardInput.readDataToEndOfFile().asUTF8String)
+    }
+
     static func read(useClipboard: Bool) throws -> String {
         if useClipboard || isatty(STDIN_FILENO) != 0 {
             return try ClipboardClient().readText()

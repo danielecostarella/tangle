@@ -13,10 +13,16 @@ let package = Package(
         .executable(name: "tangle", targets: ["tangle-cli"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0")
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
+        .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.3.0")
     ],
     targets: [
-        .target(name: "TangleCore"),
+        .target(
+            name: "TangleCore",
+            dependencies: [
+                .product(name: "SwiftSoup", package: "SwiftSoup")
+            ]
+        ),
         .executableTarget(
             name: "TangleGUI",
             dependencies: ["TangleCore"]

@@ -11,6 +11,12 @@ struct TangleGUIApp: App {
     var body: some Scene {
         MenuBarExtra {
             Button {
+                model.transformClipboard(.smart, message: "Smart transform complete")
+            } label: {
+                Label("Smart Transform", systemImage: "sparkles")
+            }
+
+            Button {
                 model.transformClipboard(.cleanText, message: "Clipboard cleaned")
             } label: {
                 Label("Clean Clipboard    \(model.shortcutDisplay(for: .cleanClipboard))", systemImage: "wand.and.sparkles")
@@ -39,12 +45,6 @@ struct TangleGUIApp: App {
             .keyboardShortcut("v")
 
             Divider()
-
-            Button {
-                model.transformClipboard(.tableMarkdown, message: "Converted table")
-            } label: {
-                Label("Convert Table to Markdown", systemImage: "tablecells")
-            }
 
             Menu("Convert Table") {
                 Button("Markdown") {
@@ -433,6 +433,8 @@ struct ShortcutPicker: View {
 private extension TransformationKind {
     var displayName: String {
         switch self {
+        case .smart:
+            return "Smart Transform"
         case .cleanText:
             return "Clean Clipboard"
         case .cleanURL:
