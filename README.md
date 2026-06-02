@@ -21,6 +21,23 @@ This repository currently contains the initial Swift package scaffold:
 - Swift 6 or newer
 - Apple Silicon is the primary target for now
 
+## Install
+
+For the first unsigned preview release:
+
+1. Download `Tangle.dmg` or `Tangle.zip` from the GitHub release.
+2. Open the app.
+3. If macOS blocks the first launch, use System Settings > Privacy & Security > Open Anyway.
+4. Keep Tangle running in the menu bar.
+
+The app is currently unsigned and not notarized. This is expected for `v0.1.0`; signing and notarization are planned later.
+
+## First Run
+
+Tangle has no Dock icon by default. Look for the Tangle icon in the menu bar.
+
+Clipboard-only actions work locally without accounts or cloud services. If you enable Auto-paste, macOS may ask for Accessibility permission so Tangle can simulate `Command` + `V` into the frontmost app.
+
 ## Build
 
 ```sh
@@ -40,6 +57,15 @@ The package script creates:
 - `dist/Tangle.dmg`
 
 The current DMG and ZIP are unsigned and not notarized. Notarization and Homebrew distribution are intentionally postponed.
+
+## Release
+
+Push a version tag to create a draft prerelease with ZIP and DMG assets:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
 
 ## Run the Menu Bar App
 
