@@ -6,14 +6,12 @@ Tangle is a lightweight, fast, privacy-first clipboard transformer for macOS.
 
 It sits in the menu bar, reads the current text clipboard, applies predictable local transformations, and writes the result back to the clipboard. There is no telemetry, no account system, no cloud processing, and no network dependency in the app itself.
 
-## Status
-
-This repository currently contains the initial Swift package scaffold:
+## What's Inside
 
 - `TangleCore`: local transformation logic, clipboard access, and settings persistence.
 - `TangleGUI`: native SwiftUI menu bar app.
 - `tangle`: command-line interface for scripting and automation.
-- Unit tests for text cleanup and URL cleanup.
+- 31 unit tests covering text cleanup, URL cleaning, Markdown conversion, and table formatting.
 
 ## Requirements
 
@@ -242,31 +240,7 @@ Implemented in this first version:
   - Converts TSV-like and CSV-like copied text to Markdown tables, CSV, or TSV.
   - Escapes quoted CSV values safely.
 
-Still needs product hardening:
-
-- Signed and notarized release artifacts
-- Homebrew cask
-- More long-form PDF and web fixtures
-- Richer HTML conversion for nested lists, tables, images, code blocks, and quotes
-
-## Release Notes
-
-### v0.1.4
-
-- Adds browser HTML clipboard support for Markdown conversion.
-- Preserves common rich web structure such as headings, links, bold, italic, and lists.
-- Cleans tracking parameters from converted Markdown links.
-
-### v0.1.3
-
-- Improves heading detection for text copied from web pages.
-- Keeps PDF line-wrap cleanup conservative to avoid turning wrapped prose into headings.
-
-### v0.1.2
-
-- Improves cleanup for PDF text containing hidden hyphen/control characters.
-- Adds a fixture based on software-defined vehicle report text copied from PDF.
-- Preserves compounds such as `software-driven`, `hardware-led`, and `vehicle-wide` instead of collapsing them.
+Open issues and planned improvements are tracked on [GitHub Issues](https://github.com/danielecostarella/tangle/issues).
 
 ## PDF/Text to LLM Markdown
 
