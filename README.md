@@ -44,6 +44,101 @@ Tangle has no Dock icon by default. Look for the Tangle icon in the menu bar.
 
 Clipboard-only actions work locally without accounts or cloud services. If you enable Auto-paste, macOS may ask for Accessibility permission so Tangle can simulate `Command` + `V` into the frontmost app.
 
+## What Tangle Is For
+
+Tangle is useful when the text you copied is technically correct, but annoying to paste somewhere else.
+
+Common examples:
+
+- You copy text from a PDF and it arrives with broken lines, repeated headers, page numbers, and strange spacing.
+- You copy a web article and want clean Markdown with headings, links, bold text, and lists.
+- You copy a long URL and want to remove tracking parameters before sharing it.
+- You copy a table from a webpage or spreadsheet and want Markdown, CSV, or TSV.
+- You want to paste plain text into Mail, Slack, Notes, Notion, or an editor without bringing along formatting.
+- You want to reduce token waste before pasting copied material into an LLM.
+
+## Everyday Examples
+
+### Clean Up Text From a PDF
+
+Copy text from a PDF, then choose **Clean Clipboard** or **Convert to Markdown** from the menu bar.
+
+Before:
+
+```text
+Software-defined vehi-
+cles are shifting the industry
+from hardware-led products
+to software-driven platforms.
+```
+
+After:
+
+```text
+Software-defined vehicles are shifting the industry from hardware-led products to software-driven platforms.
+```
+
+This is especially useful before sending source material to an LLM, because it removes noise without sending anything to a cloud service.
+
+### Turn a Web Page Selection Into Markdown
+
+Copy part of a web page, then choose **Convert to Markdown**.
+
+Tangle can preserve common browser clipboard structure:
+
+```markdown
+## Future of Mobility: le soluzioni di domani
+
+Il settore **automotive** è in costante evoluzione.
+
+Leggi il [report Deloitte](https://www.deloitte.com/it/it/Industries/automotive/about/automotive-deloitte-automotivesector.html).
+```
+
+That makes copied web content easier to paste into notes, documentation, prompts, issues, or Markdown editors.
+
+### Share a Cleaner URL
+
+Copy a URL with tracking parameters, then choose **Clean URL**.
+
+Before:
+
+```text
+https://example.com/article?utm_source=google&utm_medium=cpc&gclid=abc&id=42
+```
+
+After:
+
+```text
+https://example.com/article?id=42
+```
+
+Tangle removes common trackers while preserving meaningful parameters.
+
+### Convert a Table
+
+Copy tabular text, then choose **Convert Table to Markdown**.
+
+Before:
+
+```text
+Company	Segment
+Deloitte	Automotive
+KPMG	Mobility
+```
+
+After:
+
+```markdown
+| Company | Segment |
+| --- | --- |
+| Deloitte | Automotive |
+| KPMG | Mobility |
+```
+
+### Paste Cleanly
+
+Use **Paste Cleaned Text** when you want to paste into another app without formatting and with whitespace cleaned up first.
+
 ## Build
 
 ```sh
@@ -66,7 +161,7 @@ The current DMG and ZIP are unsigned and not notarized. Notarization and Homebre
 
 ## Release
 
-Push a version tag to create a draft prerelease with ZIP and DMG assets:
+Push a version tag to create a public release with ZIP and DMG assets:
 
 ```sh
 git tag v0.1.0
@@ -138,6 +233,8 @@ Implemented in this first version:
   - Supports multiple URLs in copied text.
 - Markdown
   - Converts PDF/web text into conservative Markdown.
+  - Reads browser clipboard HTML when available to preserve headings, links, bold, italic, and lists.
+  - Cleans tracking parameters from links converted out of HTML.
   - Normalizes bullet characters.
   - Converts underline headings and obvious all-caps headings.
   - Includes an `llm` preset for compact, token-conscious output.
@@ -150,8 +247,20 @@ Still needs product hardening:
 - Signed and notarized release artifacts
 - Homebrew cask
 - More long-form PDF and web fixtures
+- Richer HTML conversion for nested lists, tables, images, code blocks, and quotes
 
 ## Release Notes
+
+### v0.1.4
+
+- Adds browser HTML clipboard support for Markdown conversion.
+- Preserves common rich web structure such as headings, links, bold, italic, and lists.
+- Cleans tracking parameters from converted Markdown links.
+
+### v0.1.3
+
+- Improves heading detection for text copied from web pages.
+- Keeps PDF line-wrap cleanup conservative to avoid turning wrapped prose into headings.
 
 ### v0.1.2
 
