@@ -17,6 +17,17 @@ public struct TangleTransformer: Sendable {
         self.settings = settings
     }
 
+    public func transform(_ input: ClipboardContent, kind: TransformationKind) -> String {
+        if case .markdown = kind, let html = input.html?.nonEmptyHTML {
+            return MarkdownTransformer(
+                preset: settings.markdownPreset,
+                paragraphPreservation: settings.paragraphPreservation
+            ).transform(html: html, fallbackText: input.text)
+        }
+
+        return transform(input.text, kind: kind)
+    }
+
     public func transform(_ input: String, kind: TransformationKind) -> String {
         switch kind {
         case .cleanText, .plainPaste:
@@ -38,5 +49,12 @@ public struct TangleTransformer: Sendable {
         case .tableTSV:
             return TableConverter().convert(input, to: .tsv)
         }
+    }
+}
+
+private extension String {
+    var nonEmptyHTML: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }

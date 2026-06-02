@@ -38,6 +38,52 @@ final class MarkdownTransformerTests: XCTestCase {
         XCTAssertEqual(output, expected)
     }
 
+    func testConvertsBrowserHTMLToMarkdown() {
+        let html = """
+        <html>
+        <body>
+          <h1>Sfide e opportunità del settore Automotive</h1>
+          <p>Il settore <strong>automotive</strong> è in costante evoluzione.</p>
+          <h2>Future of Mobility: le soluzioni di domani</h2>
+          <p>Leggi il <a href="https://www.deloitte.com/it/it/Industries/automotive/about/automotive-deloitte-automotivesector.html?utm_source=google&amp;utm_medium=cpc&amp;gclid=abc#report">report Deloitte</a>.</p>
+          <ul>
+            <li><a href="https://www.deloitte.com/it/it.html">Deloitte Italia</a></li>
+          </ul>
+        </body>
+        </html>
+        """
+
+        let output = MarkdownTransformer(preset: .llm).transform(
+            html: html,
+            fallbackText: "Sfide e opportunità del settore Automotive"
+        )
+
+        XCTAssertEqual(output, """
+        # Sfide e opportunità del settore Automotive
+
+        Il settore **automotive** è in costante evoluzione.
+
+        ## Future of Mobility: le soluzioni di domani
+
+        Leggi il [report Deloitte](https://www.deloitte.com/it/it/Industries/automotive/about/automotive-deloitte-automotivesector.html#report).
+
+        - [Deloitte Italia](https://www.deloitte.com/it/it.html)
+        """)
+    }
+
+    func testFallsBackToPlainTextWhenHTMLHasNoContent() {
+        let output = MarkdownTransformer(preset: .llm).transform(
+            html: "<script>ignored()</script>",
+            fallbackText: "TANGLE NOTES\n\nClipboard text"
+        )
+
+        XCTAssertEqual(output, """
+        ## Tangle Notes
+
+        Clipboard text
+        """)
+    }
+
     func testConvertsPdfLikeTextToCompactMarkdown() {
         let input = """
         TANGLE WHITEPAPER

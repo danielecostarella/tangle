@@ -84,11 +84,26 @@ struct Markdown: ParsableCommand {
     var stats = false
 
     func run() throws {
-        let input = try Input.read(useClipboard: clipboard)
-        let output = MarkdownTransformer(
+        let transformer = MarkdownTransformer(
             preset: preset.markdownPreset,
             paragraphPreservation: mode.paragraphPreservation
-        ).transform(input)
+        )
+        let input: String
+        let output: String
+
+        if clipboard {
+            let content = try ClipboardClient().readContent()
+            input = content.text
+            if let html = content.html?.trimmingCharacters(in: .whitespacesAndNewlines), !html.isEmpty {
+                output = transformer.transform(html: html, fallbackText: content.text)
+            } else {
+                output = transformer.transform(content.text)
+            }
+        } else {
+            input = try Input.read(useClipboard: false)
+            output = transformer.transform(input)
+        }
+
         if stats {
             Output.writeStats(input: input, output: output)
         }

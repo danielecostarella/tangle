@@ -19,6 +19,17 @@ final class TangleTransformerTests: XCTestCase {
         """)
     }
 
+    func testMarkdownUsesClipboardHTMLWhenAvailable() {
+        let content = ClipboardContent(
+            text: "Plain fallback",
+            html: "<p><strong>Rich</strong> <a href=\"https://example.com/?utm_source=x&id=42\">link</a></p>"
+        )
+
+        let output = TangleTransformer().transform(content, kind: .markdown)
+
+        XCTAssertEqual(output, "**Rich** [link](https://example.com/?id=42)")
+    }
+
     func testUsesConfiguredURLAllowlist() {
         let settings = TangleSettings(allowedURLParameters: ["utm_source"])
         let output = TangleTransformer(settings: settings).transform(

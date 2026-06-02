@@ -119,13 +119,13 @@ final class TangleAppModel: ObservableObject {
 
     func transformClipboard(_ kind: TransformationKind, message: String) {
         do {
-            let input = try clipboard.readText()
+            let input = try clipboard.readContent()
             let output = TangleTransformer(settings: settings).transform(input, kind: kind)
             try clipboard.writeText(output)
 
-            let savings = input.count - output.count
+            let savings = input.text.count - output.count
             lastCharacterSavings = savings
-            lastPreview = TransformPreview(kind: kind, input: input, output: output)
+            lastPreview = TransformPreview(kind: kind, input: input.text, output: output)
             statusMessage = statusText(message: message, savings: savings)
 
             if settings.isHUDEnabled {
