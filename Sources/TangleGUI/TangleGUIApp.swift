@@ -105,6 +105,7 @@ final class TangleAppModel: ObservableObject {
 
     @Published var statusMessage = ""
     @Published var lastCharacterSavings: Int?
+    @Published var lastPreview: TransformPreview?
 
     private let clipboard = ClipboardClient()
     private let hud = HUDController()
@@ -124,6 +125,7 @@ final class TangleAppModel: ObservableObject {
 
             let savings = input.count - output.count
             lastCharacterSavings = savings
+            lastPreview = TransformPreview(kind: kind, input: input, output: output)
             statusMessage = statusText(message: message, savings: savings)
 
             if settings.isHUDEnabled {
@@ -146,6 +148,23 @@ final class TangleAppModel: ObservableObject {
     func resetURLParameters() {
         settings.allowedURLParameters = []
         settings.blockedURLParameters = URLCleaner.defaultBlockedParameters
+    }
+
+    func copyPreviewOutput() {
+        guard let lastPreview else { return }
+
+        do {
+            try clipboard.writeText(lastPreview.output)
+            statusMessage = "Preview output copied"
+            if settings.isHUDEnabled {
+                hud.show(message: statusMessage)
+            }
+        } catch {
+            statusMessage = error.localizedDescription
+            if settings.isHUDEnabled {
+                hud.show(message: statusMessage, isError: true)
+            }
+        }
     }
 
     func shortcutDisplay(for action: TangleShortcutAction) -> String {
@@ -205,6 +224,20 @@ final class TangleAppModel: ObservableObject {
     }
 }
 
+struct TransformPreview: Equatable {
+    let kind: TransformationKind
+    let input: String
+    let output: String
+    let stats: TransformationStats
+
+    init(kind: TransformationKind, input: String, output: String) {
+        self.kind = kind
+        self.input = input
+        self.output = output
+        stats = TransformationStats(input: input, output: output)
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var model: TangleAppModel
 
@@ -216,17 +249,7 @@ struct SettingsView: View {
                     Toggle("Auto-paste", isOn: $model.settings.autoPasteAfterTransform)
 
                     if model.settings.autoPasteAfterTransform {
-                        LabeledContent("Accessibility", value: model.isAccessibilityTrusted ? "Allowed" : "Required")
-
-                        HStack {
-                            Button("Request Permission") {
-                                model.requestAccessibilityPermission()
-                            }
-
-                            Button("Open Settings") {
-                                model.openAccessibilitySettings()
-                            }
-                        }
+                        AccessibilityPermissionView(model: model)
                     }
                 }
 
@@ -259,6 +282,11 @@ struct SettingsView: View {
                 Label("General", systemImage: "slider.horizontal.3")
             }
 
+            PreviewView(model: model)
+                .tabItem {
+                    Label("Preview", systemImage: "rectangle.split.2x1")
+                }
+
             Form {
                 Section("URL Parameters") {
                     ParameterListEditor(
@@ -281,7 +309,103 @@ struct SettingsView: View {
             }
         }
         .padding(24)
-        .frame(width: 520, height: 420)
+        .frame(width: 680, height: 520)
+    }
+}
+
+struct AccessibilityPermissionView: View {
+    @ObservedObject var model: TangleAppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Circle()
+                    .fill(model.isAccessibilityTrusted ? Color.green : Color.orange)
+                    .frame(width: 9, height: 9)
+
+                Text(model.isAccessibilityTrusted ? "Accessibility allowed" : "Accessibility required")
+                    .font(.headline)
+            }
+
+            Text(model.isAccessibilityTrusted ? "Auto-paste can send the transformed clipboard to the frontmost app." : "Auto-paste needs permission to simulate Command-V locally.")
+                .foregroundStyle(.secondary)
+
+            HStack {
+                Button("Request Permission") {
+                    model.requestAccessibilityPermission()
+                }
+
+                Button("Open Settings") {
+                    model.openAccessibilitySettings()
+                }
+            }
+        }
+    }
+}
+
+struct PreviewView: View {
+    @ObservedObject var model: TangleAppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let preview = model.lastPreview {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(preview.kind.displayName)
+                            .font(.headline)
+                        Text(statsLine(preview.stats))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button("Copy Output") {
+                        model.copyPreviewOutput()
+                    }
+                }
+
+                HStack(spacing: 12) {
+                    PreviewTextPane(title: "Before", text: preview.input)
+                    PreviewTextPane(title: "After", text: preview.output)
+                }
+            } else {
+                ContentUnavailableView(
+                    "No Preview Yet",
+                    systemImage: "rectangle.split.2x1",
+                    description: Text("Run a transformation from the menu to compare clipboard input and output.")
+                )
+            }
+        }
+        .padding(.vertical, 8)
+    }
+
+    private func statsLine(_ stats: TransformationStats) -> String {
+        let charWord = stats.characterDelta >= 0 ? "saved" : "added"
+        let tokenWord = stats.estimatedTokenDelta >= 0 ? "saved" : "added"
+        return "\(abs(stats.characterDelta)) chars \(charWord) · ~\(abs(stats.estimatedTokenDelta)) tokens \(tokenWord)"
+    }
+}
+
+struct PreviewTextPane: View {
+    let title: String
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.headline)
+
+            ScrollView {
+                Text(text.isEmpty ? " " : text)
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+            }
+            .frame(minHeight: 240)
+            .background(Color(nsColor: .textBackgroundColor))
+            .border(.separator)
+        }
     }
 }
 
@@ -302,6 +426,27 @@ struct ShortcutPicker: View {
             model.settings.shortcutKeys[action] ?? TangleSettings.defaultShortcutKeys[action] ?? .c
         } set: { newValue in
             model.settings.shortcutKeys[action] = newValue
+        }
+    }
+}
+
+private extension TransformationKind {
+    var displayName: String {
+        switch self {
+        case .cleanText:
+            return "Clean Clipboard"
+        case .cleanURL:
+            return "Clean URL"
+        case .markdown:
+            return "Convert to Markdown"
+        case .tableMarkdown:
+            return "Convert Table to Markdown"
+        case .tableCSV:
+            return "Convert Table to CSV"
+        case .tableTSV:
+            return "Convert Table to TSV"
+        case .plainPaste:
+            return "Paste Cleaned Text"
         }
     }
 }
