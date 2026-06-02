@@ -151,6 +151,14 @@ Still needs product hardening:
 - Homebrew cask
 - More long-form PDF and web fixtures
 
+## Release Notes
+
+### v0.1.2
+
+- Improves cleanup for PDF text containing hidden hyphen/control characters.
+- Adds a fixture based on software-defined vehicle report text copied from PDF.
+- Preserves compounds such as `software-driven`, `hardware-led`, and `vehicle-wide` instead of collapsing them.
+
 ## PDF/Text to LLM Markdown
 
 One of Tangle's core workflows is cleaning text copied from PDFs before sending it to an LLM:

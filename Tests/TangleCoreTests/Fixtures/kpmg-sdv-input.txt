@@ -1,0 +1,6 @@
+Software-defined vehicles are shifting the industry from hardwareled products to softwaredriven platforms.
+Centralized computing, AI and over-the-air updates are making software a
+core source of competitive advantage and lifetime value.
+
+Modern functions such as ADAS and EV energy management often sit on top of legacy domains.
+Advanced perception, autonomy and predictive control require access to vehiclewide data in real time.

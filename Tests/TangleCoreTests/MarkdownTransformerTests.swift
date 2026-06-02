@@ -20,6 +20,15 @@ final class MarkdownTransformerTests: XCTestCase {
         XCTAssertEqual(output, expected)
     }
 
+    func testKPMGSoftwareDefinedVehicleFixture() throws {
+        let input = try fixture(named: "kpmg-sdv-input", extension: "txt")
+        let expected = try fixture(named: "kpmg-sdv-expected", extension: "md")
+
+        let output = MarkdownTransformer(preset: .llm).transform(input)
+
+        XCTAssertEqual(output, expected)
+    }
+
     func testConvertsPdfLikeTextToCompactMarkdown() {
         let input = """
         TANGLE WHITEPAPER
