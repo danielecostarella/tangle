@@ -223,6 +223,8 @@ When stdin is piped, the CLI reads stdin and writes stdout. With `--clipboard`, 
 swift test
 ```
 
+Manual QA checklists live in [`docs/QA.md`](docs/QA.md), including real-app coverage for Auto-transform on copy.
+
 ## Transformations
 
 Implemented in this first version:

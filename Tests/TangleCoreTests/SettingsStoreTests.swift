@@ -15,9 +15,12 @@ final class SettingsStoreTests: XCTestCase {
         let settings = TangleSettings(
             isHUDEnabled: false,
             autoPasteAfterTransform: true,
+            autoTransformOnCopy: true,
+            autoTransformConfidenceThreshold: 0.9,
             paragraphPreservation: .aggressive,
             markdownPreset: .standard,
             shortcutKeys: [
+                .quickTransformPicker: .b,
                 .cleanClipboard: .x,
                 .cleanURL: .u,
                 .markdown: .m,
@@ -47,6 +50,8 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertFalse(settings.isHUDEnabled)
         XCTAssertTrue(settings.autoPasteAfterTransform)
+        XCTAssertFalse(settings.autoTransformOnCopy)
+        XCTAssertEqual(settings.autoTransformConfidenceThreshold, 0.75)
         XCTAssertEqual(settings.paragraphPreservation, .conservative)
         XCTAssertEqual(settings.markdownPreset, .llm)
         XCTAssertEqual(settings.shortcutKeys, TangleSettings.defaultShortcutKeys)
