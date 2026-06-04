@@ -45,6 +45,18 @@ struct TangleGUIApp: App {
             .keyboardShortcut("m")
 
             Button {
+                model.transformClipboard(.imageText, message: "Text extracted from image")
+            } label: {
+                Label("Extract Text from Image", systemImage: "text.viewfinder")
+            }
+
+            Button {
+                model.transformClipboard(.imageMarkdown, message: "Image converted to Markdown")
+            } label: {
+                Label("Convert Image to Markdown", systemImage: "photo.badge.checkmark")
+            }
+
+            Button {
                 model.transformClipboard(.plainPaste, message: "Plain text ready")
             } label: {
                 Label("Paste Cleaned Text    \(model.shortcutDisplay(for: .pasteCleanedText))", systemImage: "doc.on.clipboard")
@@ -142,12 +154,12 @@ final class TangleAppModel: ObservableObject {
     func transformClipboard(_ kind: TransformationKind, message: String) {
         do {
             let input = try clipboard.readContent()
-            let output = TangleTransformer(settings: settings).transform(input, kind: kind)
+            let output = try TangleTransformer(settings: settings).transformContent(input, kind: kind)
             try clipboard.writeText(output)
 
             let savings = input.text.count - output.count
             lastCharacterSavings = savings
-            lastPreview = TransformPreview(kind: kind, input: input.text, output: output)
+            lastPreview = TransformPreview(kind: kind, input: input.previewText, output: output)
             statusMessage = statusText(message: message, savings: savings)
 
             if settings.isHUDEnabled {
@@ -179,13 +191,15 @@ final class TangleAppModel: ObservableObject {
             .cleanText,
             .cleanURL,
             .markdown,
+            .imageText,
+            .imageMarkdown,
             .tableMarkdown,
             .tableCSV,
             .tableTSV,
             .plainPaste
         ]
-        let options = kinds.map { kind in
-            let output = TangleTransformer(settings: settings).transform(input, kind: kind)
+        let options = try kinds.map { kind in
+            let output = try TangleTransformer(settings: settings).transformContent(input, kind: kind)
             return QuickTransformOption(
                 kind: kind,
                 input: input,
@@ -202,7 +216,7 @@ final class TangleAppModel: ObservableObject {
             try clipboard.writeText(option.output)
             observedPasteboardChangeCount = NSPasteboard.general.changeCount
             lastCharacterSavings = option.stats.characterDelta
-            lastPreview = TransformPreview(kind: option.kind, input: option.input.text, output: option.output)
+            lastPreview = TransformPreview(kind: option.kind, input: option.input.previewText, output: option.output)
             statusMessage = statusText(message: "\(option.kind.displayName) applied", savings: option.stats.characterDelta)
             quickTransformPanel.close()
 
@@ -331,6 +345,8 @@ final class TangleAppModel: ObservableObject {
         let detection = SmartClipboardDetector().detect(content)
         guard shouldAutoTransform(content: content, detection: detection) else { return }
 
+        guard detection.kind != .image else { return }
+
         let output = TangleTransformer(settings: settings).transform(content, kind: detection.recommendedTransformation)
         guard output != content.text else { return }
 
@@ -342,7 +358,7 @@ final class TangleAppModel: ObservableObject {
 
             let stats = TransformationStats(input: content.text, output: output)
             lastCharacterSavings = stats.characterDelta
-            lastPreview = TransformPreview(kind: detection.recommendedTransformation, input: content.text, output: output)
+            lastPreview = TransformPreview(kind: detection.recommendedTransformation, input: content.previewText, output: output)
             statusMessage = statusText(message: "Auto-transformed \(detection.kind.rawValue)", savings: stats.characterDelta)
 
             if settings.isHUDEnabled {
@@ -401,6 +417,20 @@ private extension TangleAppModel {
     ]
 }
 
+private extension ClipboardContent {
+    var previewText: String {
+        if !text.isEmpty {
+            return text
+        }
+
+        if hasImage {
+            return "[Image clipboard]"
+        }
+
+        return ""
+    }
+}
+
 private extension String {
     var looksLikePasswordFragment: Bool {
         guard !contains(where: \.isWhitespace),
@@ -446,7 +476,7 @@ struct QuickTransformOption: Identifiable {
         self.input = input
         self.output = output
         self.isRecommended = isRecommended
-        stats = TransformationStats(input: input.text, output: output)
+        stats = TransformationStats(input: input.previewText, output: output)
     }
 }
 
@@ -817,6 +847,10 @@ private extension TransformationKind {
             return "Clean URL"
         case .markdown:
             return "Convert to Markdown"
+        case .imageText:
+            return "Extract Text from Image"
+        case .imageMarkdown:
+            return "Convert Image to Markdown"
         case .tableMarkdown:
             return "Convert Table to Markdown"
         case .tableCSV:

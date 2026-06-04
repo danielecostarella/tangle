@@ -5,6 +5,8 @@ public enum TransformationKind: String, Sendable, CaseIterable {
     case cleanText
     case cleanURL
     case markdown
+    case imageText
+    case imageMarkdown
     case tableMarkdown
     case tableCSV
     case tableTSV
@@ -19,8 +21,12 @@ public struct TangleTransformer: Sendable {
     }
 
     public func transform(_ input: ClipboardContent, kind: TransformationKind) -> String {
+        (try? transformContent(input, kind: kind)) ?? input.text
+    }
+
+    public func transformContent(_ input: ClipboardContent, kind: TransformationKind) throws -> String {
         if case .smart = kind {
-            return transform(input, kind: SmartClipboardDetector().detect(input).recommendedTransformation)
+            return try transformContent(input, kind: SmartClipboardDetector().detect(input).recommendedTransformation)
         }
 
         if case .markdown = kind, let html = input.html?.nonEmptyHTML {
@@ -28,6 +34,14 @@ public struct TangleTransformer: Sendable {
                 preset: settings.markdownPreset,
                 paragraphPreservation: settings.paragraphPreservation
             ).transform(html: html, fallbackText: input.text)
+        }
+
+        if case .imageText = kind, let imageData = input.imageData {
+            return try ImageOCRTransformer().extractText(from: imageData)
+        }
+
+        if case .imageMarkdown = kind, let imageData = input.imageData {
+            return try ImageOCRTransformer().extractMarkdown(from: imageData)
         }
 
         return transform(input.text, kind: kind)
@@ -54,6 +68,8 @@ public struct TangleTransformer: Sendable {
                 preset: settings.markdownPreset,
                 paragraphPreservation: settings.paragraphPreservation
             ).transform(input)
+        case .imageText, .imageMarkdown:
+            return input
         case .tableMarkdown:
             return TableConverter().convert(input, to: .markdown)
         case .tableCSV:

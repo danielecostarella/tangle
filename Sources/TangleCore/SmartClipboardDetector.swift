@@ -1,6 +1,7 @@
 import Foundation
 
 public enum DetectedClipboardContentKind: String, Sendable, Codable, CaseIterable {
+    case image
     case richHTML
     case url
     case table
@@ -31,6 +32,10 @@ public struct SmartClipboardDetector: Sendable {
     public func detect(_ content: ClipboardContent) -> SmartClipboardDetection {
         if let html = content.html?.trimmingCharacters(in: .whitespacesAndNewlines), !html.isEmpty {
             return SmartClipboardDetection(kind: .richHTML, confidence: 0.95, recommendedTransformation: .markdown)
+        }
+
+        if content.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, content.hasImage {
+            return SmartClipboardDetection(kind: .image, confidence: 0.9, recommendedTransformation: .imageMarkdown)
         }
 
         return detect(content.text)

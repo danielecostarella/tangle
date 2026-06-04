@@ -14,6 +14,7 @@ struct TangleCLI: ParsableCommand {
             Clean.self,
             CleanURL.self,
             Markdown.self,
+            Image.self,
             Table.self
         ],
         defaultSubcommand: Clean.self
@@ -35,7 +36,7 @@ struct Smart: ParsableCommand {
     func run() throws {
         let content = try Input.readContent(useClipboard: clipboard)
         let detection = SmartClipboardDetector().detect(content)
-        let output = TangleTransformer().transform(content, kind: .smart)
+        let output = try TangleTransformer().transformContent(content, kind: .smart)
 
         if stats {
             let message = "detected: \(detection.kind.rawValue), confidence: \(String(format: "%.2f", detection.confidence))\n"
@@ -175,6 +176,57 @@ struct Table: ParsableCommand {
     }
 }
 
+struct Image: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "image",
+        abstract: "Extract local OCR text from an image file or clipboard image."
+    )
+
+    @Argument(help: "Optional image path. Omit with --clipboard to read the macOS clipboard image.")
+    var path: String?
+
+    @Flag(help: "Read from and write back to the macOS clipboard.")
+    var clipboard = false
+
+    @Option(help: "Output format: text or markdown.")
+    var to: ImageOutputOption = .markdown
+
+    @Flag(help: "Print character count to stderr.")
+    var stats = false
+
+    func run() throws {
+        let imageData: Data
+
+        if clipboard || path == nil {
+            let content = try ClipboardClient().readContent()
+            guard let clipboardImageData = content.imageData else {
+                throw ClipboardError.noSupportedContentOnClipboard
+            }
+            imageData = clipboardImageData
+        } else if let path {
+            imageData = try Data(contentsOf: URL(fileURLWithPath: path))
+        } else {
+            throw ClipboardError.noSupportedContentOnClipboard
+        }
+
+        let transformer = ImageOCRTransformer()
+        let output: String
+        switch to {
+        case .text:
+            output = try transformer.extractText(from: imageData)
+        case .markdown:
+            output = try transformer.extractMarkdown(from: imageData)
+        }
+
+        if stats {
+            let message = "output: \(output.count) chars\n"
+            FileHandle.standardError.write(Data(message.utf8))
+        }
+
+        try Output.write(output, useClipboard: clipboard)
+    }
+}
+
 enum CleanupMode: String, ExpressibleByArgument {
     case conservative
     case balanced
@@ -221,6 +273,11 @@ enum TableFormatOption: String, ExpressibleByArgument {
             return .tsv
         }
     }
+}
+
+enum ImageOutputOption: String, ExpressibleByArgument {
+    case text
+    case markdown
 }
 
 enum Input {

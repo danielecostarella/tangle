@@ -11,7 +11,7 @@ It sits in the menu bar, reads the current text clipboard, applies predictable l
 - `TangleCore`: local transformation logic, clipboard access, and settings persistence.
 - `TangleGUI`: native SwiftUI menu bar app.
 - `tangle`: command-line interface for scripting and automation.
-- 45 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, and table formatting.
+- 48 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, image Markdown formatting, and table formatting.
 
 ## Requirements
 
@@ -52,6 +52,7 @@ Common examples:
 - You copy a web article and want clean Markdown with headings, links, bold text, and lists.
 - You copy a long URL and want to remove tracking parameters before sharing it.
 - You copy a table from a webpage or spreadsheet and want Markdown, CSV, or TSV.
+- You copy a screenshot or image and want local OCR text or Markdown.
 - You want to paste plain text into Mail, Slack, Notes, Notion, or an editor without bringing along formatting.
 - You want to reduce token waste before pasting copied material into an LLM.
 
@@ -133,6 +134,23 @@ After:
 | Northstar Analysis | Mobility |
 ```
 
+### Extract Text From an Image
+
+Copy a screenshot or image, then choose **Extract Text from Image** or **Convert Image to Markdown**.
+
+Tangle uses Apple Vision locally on your Mac:
+
+```markdown
+## MARKET OUTLOOK
+
+Software platforms are changing mobility.
+
+- Faster update cycles
+- Better diagnostics
+```
+
+This is useful when text copy is unavailable or when a PDF page, slide, or web screenshot is effectively an image.
+
 ### Paste Cleanly
 
 Use **Paste Cleaned Text** when you want to paste into another app without formatting and with whitespace cleaned up first.
@@ -181,6 +199,8 @@ Current menu bar actions:
 - Clean Clipboard: `Control` + `Option` + `Command` + `C`
 - Clean URL: `Control` + `Option` + `Command` + `U`
 - Convert to Markdown: `Control` + `Option` + `Command` + `M`
+- Extract Text from Image
+- Convert Image to Markdown
 - Paste Cleaned Text: `Control` + `Option` + `Command` + `V`
 - Convert Table to Markdown, CSV, or TSV
 
@@ -208,6 +228,8 @@ swift run tangle clean --clipboard
 swift run tangle url
 swift run tangle markdown
 swift run tangle markdown --preset llm --stats
+swift run tangle image --clipboard --to markdown
+swift run tangle image screenshot.png --to text
 swift run tangle table --to markdown
 swift run tangle table --to csv
 pbpaste | swift run tangle url | pbcopy
@@ -249,6 +271,11 @@ Implemented in this first version:
   - Normalizes bullet characters.
   - Converts underline headings and obvious all-caps headings.
   - Includes an `llm` preset for compact, token-conscious output.
+- Image OCR
+  - Reads copied images from the macOS clipboard or image files from the CLI.
+  - Uses Apple Vision locally to recognize text.
+  - Outputs plain OCR text or conservative Markdown.
+  - Detects image-only clipboard content in Smart Transform.
 - Smart Transform
   - Detects URL-heavy, table-like, rich HTML, code-like, Markdown-like, and plain text clipboard content.
   - Routes the clipboard through the best local transformation without calling external services.

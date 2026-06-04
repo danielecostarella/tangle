@@ -131,6 +131,25 @@ Expected:
 - Apply writes the chosen output to the clipboard.
 - Cancel closes the panel without changing the clipboard.
 
+## Image OCR
+
+1. Copy a screenshot or image that contains a short heading, paragraph, and bullet list.
+2. Choose Extract Text from Image.
+3. Paste into a text editor.
+4. Copy the same image again.
+5. Choose Convert Image to Markdown.
+6. Paste into a Markdown editor or text editor.
+
+Expected:
+
+- OCR runs locally and does not require network access.
+- Extract Text from Image writes readable plain text.
+- Convert Image to Markdown emits conservative Markdown.
+- Obvious headings and bullets are preserved when Vision recognizes them clearly.
+- If no text is recognized, Tangle shows an error instead of clearing useful clipboard text silently.
+
+Repeat once with a screenshot from a slide and once with a scanned/PDF image crop.
+
 ## Auto-paste Smoke Test
 
 1. Enable Auto-paste.
