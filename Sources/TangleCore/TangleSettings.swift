@@ -12,11 +12,11 @@ public enum TangleShortcutAction: String, Codable, Sendable, CaseIterable {
         case .quickTransformPicker:
             return "Quick Transform Picker"
         case .cleanClipboard:
-            return "Clean Clipboard"
+            return "Paste Clean Text"
         case .cleanURL:
             return "Clean URL"
         case .markdown:
-            return "Markdown"
+            return "Paste Markdown"
         case .pasteCleanedText:
             return "Paste Cleaned Text"
         }

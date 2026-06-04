@@ -11,24 +11,29 @@ struct TangleGUIApp: App {
     var body: some Scene {
         MenuBarExtra {
             Button {
+                model.transformClipboard(.smart, message: "Pasted as Markdown")
+            } label: {
+                Label("Paste Markdown    \(model.shortcutDisplay(for: .markdown))", systemImage: "doc.richtext")
+            }
+            .keyboardShortcut("m")
+
+            Button {
+                model.transformClipboard(.smartText, message: "Pasted as clean text")
+            } label: {
+                Label("Paste Clean Text    \(model.shortcutDisplay(for: .cleanClipboard))", systemImage: "doc.plaintext")
+            }
+            .keyboardShortcut("c")
+
+            Divider()
+
+            Button {
                 model.showQuickTransformPicker()
             } label: {
                 Label("Quick Transform Picker    \(model.shortcutDisplay(for: .quickTransformPicker))", systemImage: "rectangle.and.text.magnifyingglass")
             }
             .keyboardShortcut("p")
 
-            Button {
-                model.transformClipboard(.smart, message: "Smart transform complete")
-            } label: {
-                Label("Smart Transform", systemImage: "sparkles")
-            }
-
-            Button {
-                model.transformClipboard(.cleanText, message: "Clipboard cleaned")
-            } label: {
-                Label("Clean Clipboard    \(model.shortcutDisplay(for: .cleanClipboard))", systemImage: "wand.and.sparkles")
-            }
-            .keyboardShortcut("c")
+            Divider()
 
             Button {
                 model.transformClipboard(.cleanURL, message: "URL tracking removed")
@@ -36,48 +41,6 @@ struct TangleGUIApp: App {
                 Label("Clean URL    \(model.shortcutDisplay(for: .cleanURL))", systemImage: "link")
             }
             .keyboardShortcut("u")
-
-            Button {
-                model.transformClipboard(.markdown, message: "Converted to Markdown")
-            } label: {
-                Label("Convert to Markdown    \(model.shortcutDisplay(for: .markdown))", systemImage: "text.quote")
-            }
-            .keyboardShortcut("m")
-
-            Button {
-                model.transformClipboard(.imageText, message: "Text extracted from image")
-            } label: {
-                Label("Extract Text from Image", systemImage: "text.viewfinder")
-            }
-
-            Button {
-                model.transformClipboard(.imageMarkdown, message: "Image converted to Markdown")
-            } label: {
-                Label("Convert Image to Markdown", systemImage: "photo.badge.checkmark")
-            }
-
-            Button {
-                model.transformClipboard(.plainPaste, message: "Plain text ready")
-            } label: {
-                Label("Paste Cleaned Text    \(model.shortcutDisplay(for: .pasteCleanedText))", systemImage: "doc.on.clipboard")
-            }
-            .keyboardShortcut("v")
-
-            Divider()
-
-            Menu("Convert Table") {
-                Button("Markdown") {
-                    model.transformClipboard(.tableMarkdown, message: "Converted table")
-                }
-
-                Button("CSV") {
-                    model.transformClipboard(.tableCSV, message: "Converted table")
-                }
-
-                Button("TSV") {
-                    model.transformClipboard(.tableTSV, message: "Converted table")
-                }
-            }
 
             Divider()
 
@@ -339,13 +302,13 @@ final class TangleAppModel: ObservableObject {
         shortcuts.register(shortcutKeys: settings.shortcutKeys) {
             self.showQuickTransformPicker()
         } cleanClipboard: {
-            self.transformClipboard(.cleanText, message: "Clipboard cleaned")
+            self.transformClipboard(.smartText, message: "Pasted as clean text")
         } cleanURL: {
             self.transformClipboard(.cleanURL, message: "URL tracking removed")
         } markdown: {
-            self.transformClipboard(.markdown, message: "Converted to Markdown")
+            self.transformClipboard(.smart, message: "Pasted as Markdown")
         } pasteCleanedText: {
-            self.transformClipboard(.plainPaste, message: "Plain text ready")
+            self.transformClipboard(.smartText, message: "Pasted as clean text")
         }
     }
 
@@ -745,11 +708,10 @@ struct SettingsView: View {
                 }
 
                 Section("Global Shortcuts") {
-                    ShortcutPicker(action: .quickTransformPicker, model: model)
+                    ShortcutPicker(action: .markdown, model: model)
                     ShortcutPicker(action: .cleanClipboard, model: model)
                     ShortcutPicker(action: .cleanURL, model: model)
-                    ShortcutPicker(action: .markdown, model: model)
-                    ShortcutPicker(action: .pasteCleanedText, model: model)
+                    ShortcutPicker(action: .quickTransformPicker, model: model)
                 }
             }
             .tabItem {
@@ -945,7 +907,9 @@ private extension TransformationKind {
     var displayName: String {
         switch self {
         case .smart:
-            return "Smart Transform"
+            return "Paste Markdown"
+        case .smartText:
+            return "Paste Clean Text"
         case .cleanText:
             return "Clean Clipboard"
         case .cleanURL:

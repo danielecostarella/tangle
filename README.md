@@ -4,14 +4,14 @@
 
 Tangle is a lightweight, fast, privacy-first clipboard transformer for macOS.
 
-It sits in the menu bar, reads the current text clipboard, applies predictable local transformations, and writes the result back to the clipboard. There is no telemetry, no account system, no cloud processing, and no network dependency in the app itself.
+It sits in the menu bar. Copy anything — text, a screenshot, an image, Excel cells, a web page — press a shortcut, and get clean Markdown or plain text back in your clipboard instantly. No cloud, no account, no setup.
 
 ## What's Inside
 
 - `TangleCore`: local transformation logic, clipboard access, and settings persistence.
 - `TangleGUI`: native SwiftUI menu bar app.
 - `tangle`: command-line interface for scripting and automation.
-- 50 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, image Markdown formatting, and table formatting.
+- 54 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, image OCR formatting, table detection, and bold formatting.
 
 ## Requirements
 
@@ -44,7 +44,7 @@ Clipboard-only actions work locally without accounts or cloud services. If you e
 
 ## What Tangle Is For
 
-Tangle is useful when the text you copied is technically correct, but annoying to paste somewhere else.
+Tangle is useful when the content you copied is technically correct, but annoying to paste somewhere else.
 
 Common examples:
 
@@ -52,18 +52,36 @@ Common examples:
 - You copy a web article and want clean Markdown with headings, links, bold text, and lists.
 - You copy a long URL and want to remove tracking parameters before sharing it.
 - You copy a table from a webpage or spreadsheet and want Markdown, CSV, or TSV.
-- You copy a screenshot or image and want local OCR text or Markdown.
+- You copy a screenshot of a spreadsheet or presentation and want a structured Markdown table.
+- You copy a screenshot or image and want local OCR text or Markdown — with headings, bullets, and bold correctly detected.
 - You want to paste plain text into Mail, Slack, Notes, Notion, or an editor without bringing along formatting.
 - You want to reduce token waste before pasting copied material into an LLM.
+
+## How It Works
+
+The two primary actions cover the most common cases automatically:
+
+**Paste Markdown** (`⌃⌥⌘M`) detects what is on the clipboard and produces the best Markdown output:
+- Image or screenshot → Apple Vision OCR → Markdown with headings, bullets, tables, and bold
+- Rich HTML (web page, email) → clean Markdown preserving structure
+- Table text or screenshot of a table → Markdown table
+- URL → cleaned URL with tracking parameters removed
+- Plain text → cleaned text
+
+**Paste Clean Text** (`⌃⌥⌘C`) does the same but always produces plain text:
+- Image or screenshot → Apple Vision OCR → plain text
+- Any text → whitespace normalized, line breaks repaired, PDF artifacts removed
+- URL → cleaned URL
+
+For advanced use, **Quick Transform Picker** (`⌃⌥⌘P`) shows a before/after preview of every available transformation and lets you choose one before applying it.
 
 ## Everyday Examples
 
 ### Clean Up Text From a PDF
 
-Copy text from a PDF, then choose **Clean Clipboard** or **Convert to Markdown** from the menu bar.
+Copy text from a PDF, then press **`⌃⌥⌘C`** (Paste Clean Text).
 
 Before:
-
 ```text
 Software-defined vehi-
 cles are shifting the industry
@@ -72,18 +90,13 @@ to software-driven platforms.
 ```
 
 After:
-
 ```text
 Software-defined vehicles are shifting the industry from hardware-led products to software-driven platforms.
 ```
 
-This is especially useful before sending source material to an LLM, because it removes noise without sending anything to a cloud service.
-
 ### Turn a Web Page Selection Into Markdown
 
-Copy part of a web page, then choose **Convert to Markdown**.
-
-Tangle can preserve common browser clipboard structure:
+Copy part of a web page, then press **`⌃⌥⌘M`** (Paste Markdown).
 
 ```markdown
 ## Market Outlook: next-generation mobility
@@ -93,67 +106,75 @@ The **mobility sector** is changing quickly as software, services, and infrastru
 Read the [industry report](https://example.com/reports/mobility-outlook).
 ```
 
-That makes copied web content easier to paste into notes, documentation, prompts, issues, or Markdown editors.
+### Convert a Screenshot of a Spreadsheet
+
+Copy a screenshot of an Excel table, then press **`⌃⌥⌘M`** (Paste Markdown).
+
+```markdown
+| Product  | Q1      | Q2      | Q3      | Q4      |
+| ---      | ---     | ---     | ---     | ---     |
+| Widget A | $12,400 | $15,200 | $18,900 | $22,100 |
+| Widget B | $8,700  | $9,100  | $11,300 | $14,500 |
+| TOTAL    | $21,100 | $24,300 | $30,200 | $36,600 |
+```
+
+Tangle detects the grid structure from the Vision bounding boxes and reconstructs the table automatically.
+
+### Extract Text and Formatting From an Image
+
+Copy a screenshot of a presentation slide, then press **`⌃⌥⌘M`**.
+
+```markdown
+# QUARTERLY RESULTS
+
+Revenue grew 23% year-over-year
+
+- Product ARR: $42M (+31%)
+- Enterprise customers: 1,240
+- Net Revenue Retention: 118%
+```
+
+Tangle uses Apple Vision locally: no image leaves your Mac. Heading levels (H1/H2/H3) are inferred from relative font size. Bold text is detected from stroke width. Bullet characters are normalized.
 
 ### Share a Cleaner URL
 
-Copy a URL with tracking parameters, then choose **Clean URL**.
+Copy a URL with tracking parameters, then press **`⌃⌥⌘M`** or **`⌃⌥⌘U`** (Clean URL).
 
 Before:
-
 ```text
 https://example.com/article?utm_source=google&utm_medium=cpc&gclid=abc&id=42
 ```
 
 After:
-
 ```text
 https://example.com/article?id=42
 ```
 
-Tangle removes common trackers while preserving meaningful parameters.
+## OCR Language Support
 
-### Convert a Table
+Tangle uses Apple Vision for on-device OCR. The default languages are **English** and **Italian** (`en-US, it-IT`).
 
-Copy tabular text, then choose **Convert Table to Markdown**.
+The following language codes are supported (configurable in Settings → Transformations → OCR languages):
 
-Before:
-
-```text
-Company	Segment
-Example Research Group	Automotive
-Northstar Analysis	Mobility
-```
-
-After:
-
-```markdown
-| Company | Segment |
+| Language | Code |
 | --- | --- |
-| Example Research Group | Automotive |
-| Northstar Analysis | Mobility |
-```
+| English | `en-US` |
+| Italian | `it-IT` |
+| French | `fr-FR` |
+| German | `de-DE` |
+| Spanish | `es-ES` |
+| Portuguese | `pt-BR` |
+| Chinese Simplified | `zh-Hans` |
+| Chinese Traditional | `zh-Hant` |
+| Japanese | `ja-JP` |
+| Korean | `ko-KR` |
+| Russian | `ru-RU` |
+| Ukrainian | `uk-UA` |
+| Arabic | `ar-SA` |
+| Thai | `th-TH` |
+| Vietnamese | `vi-VN` |
 
-### Extract Text From an Image
-
-Copy a screenshot or image, then choose **Extract Text from Image** or **Convert Image to Markdown**.
-
-Tangle uses Apple Vision locally on your Mac:
-
-```markdown
-## MARKET OUTLOOK
-
-Software platforms are changing mobility.
-
-- Faster update cycles
-- Better diagnostics
-```
-
-This is useful when text copy is unavailable or when a PDF page, slide, or web screenshot is effectively an image.
-
-### Paste Cleanly
-
-Use **Paste Cleaned Text** when you want to paste into another app without formatting and with whitespace cleaned up first.
+Enter multiple codes separated by commas. Best results come from specifying only the languages present in your images.
 
 ## Build
 
@@ -173,8 +194,6 @@ The package script creates:
 - `dist/Tangle.zip`
 - `dist/Tangle.dmg`
 
-The current DMG and ZIP are unsigned and not notarized. Notarization and Homebrew distribution are intentionally postponed.
-
 ## Release
 
 Push a version tag to create a public release with ZIP and DMG assets:
@@ -192,29 +211,20 @@ swift run TangleGUI
 
 The app runs as a menu bar utility and hides its Dock icon at launch.
 
-Current menu bar actions:
+Menu bar actions:
 
-- Quick Transform Picker: `Control` + `Option` + `Command` + `P`
-- Smart Transform
-- Clean Clipboard: `Control` + `Option` + `Command` + `C`
-- Clean URL: `Control` + `Option` + `Command` + `U`
-- Convert to Markdown: `Control` + `Option` + `Command` + `M`
-- Extract Text from Image
-- Convert Image to Markdown
-- Paste Cleaned Text: `Control` + `Option` + `Command` + `V`
-- Convert Table to Markdown, CSV, or TSV
+- **Paste Markdown**: `⌃⌥⌘M` — smart Markdown output for any clipboard content
+- **Paste Clean Text**: `⌃⌥⌘C` — smart plain text output for any clipboard content
+- **Quick Transform Picker**: `⌃⌥⌘P` — preview all transforms before applying
+- **Clean URL**: `⌃⌥⌘U` — strip tracking parameters only
 
-The settings window includes HUD feedback, auto-paste, auto-transform on copy, cleanup mode, Markdown preset, preview/diff, shortcut customization, and URL parameter controls.
+Shortcuts are customizable in Settings. The modifier chord (`⌃⌥⌘`) is fixed for this release.
 
-Clipboard-only shortcuts do not send text anywhere. Auto-paste simulates `Command` + `V` locally and may require macOS Accessibility permission.
+The Quick Transform Picker shows a recommended transformation, estimated character and token savings, and a before/after preview — including an image thumbnail when the clipboard contains a screenshot.
 
-Auto-transform on copy is off by default. When enabled, Tangle monitors clipboard changes locally, skips code-like and password-like content, and only transforms when Smart Detect reaches the configured confidence threshold.
+The Settings window includes: HUD feedback, auto-paste, auto-transform on copy, cleanup mode, Markdown preset, OCR confidence threshold, OCR language list, shortcut customization, and URL parameter controls.
 
-Shortcut keys are customizable in Settings. The modifier chord is fixed to `Control` + `Option` + `Command` for this first release.
-
-The Quick Transform Picker shows the current clipboard, a recommended transformation, estimated savings, and a before/after preview before touching the clipboard.
-
-The Preview tab shows before/after clipboard text plus local character and approximate token savings. Token estimates are intentionally rough and never call external services.
+Auto-paste simulates `⌘V` locally and requires macOS Accessibility permission. Auto-transform on copy is off by default; when enabled it skips code-like and password-like content.
 
 ## CLI
 
@@ -246,46 +256,58 @@ When stdin is piped, the CLI reads stdin and writes stdout. With `--clipboard`, 
 swift test
 ```
 
-Manual QA checklists live in [`docs/QA.md`](docs/QA.md), including real-app coverage for Auto-transform on copy.
+Manual QA checklists live in [`docs/QA.md`](docs/QA.md).
 
 ## Transformations
 
-Implemented in this first version:
+### Smart
 
-- Clean Text
-  - Normalizes whitespace.
-  - Removes safe invisible/control characters.
-  - Collapses repeated blank lines.
-  - Joins common wrapped paragraph text.
-  - Repairs common PDF hyphenated line breaks.
-  - Preserves basic email structure such as forwarded headers and signature separators.
-  - Removes repeated short header/footer noise after the first occurrence.
-- Clean URL
-  - Removes common tracking parameters such as `utm_*`, `fbclid`, `gclid`, `mc_cid`, and `mc_eid`.
-  - Preserves meaningful query parameters.
-  - Supports multiple URLs in copied text.
-- Markdown
-  - Converts PDF/web text into conservative Markdown.
-  - Reads browser clipboard HTML when available to preserve headings, links, bold, italic, lists, quotes, code blocks, and tables.
-  - Uses SwiftSoup for DOM-based HTML parsing instead of regex-only conversion.
-  - Cleans tracking parameters from links converted out of HTML.
-  - Normalizes bullet characters.
-  - Converts underline headings and obvious all-caps headings.
-  - Includes an `llm` preset for compact, token-conscious output.
-- Image OCR
-  - Reads copied images from the macOS clipboard or image files from the CLI.
-  - Uses Apple Vision locally to recognize text.
-  - Outputs plain OCR text or conservative Markdown.
-  - Supports configurable OCR languages and minimum confidence filtering.
-  - Handles simple multi-column layouts by processing detected columns sequentially.
-  - Detects image-only clipboard content in Smart Transform.
-- Smart Transform
-  - Detects URL-heavy, table-like, rich HTML, code-like, Markdown-like, and plain text clipboard content.
-  - Routes the clipboard through the best local transformation without calling external services.
-  - Powers the Quick Transform Picker and optional auto-transform on copy mode.
-- Table conversion
-  - Converts TSV-like and CSV-like copied text to Markdown tables, CSV, or TSV.
-  - Escapes quoted CSV values safely.
+**Paste Markdown** and **Paste Clean Text** detect clipboard content type and route automatically:
+
+- Image-only clipboard → Apple Vision OCR
+- Rich HTML clipboard → HTML-to-Markdown or HTML-to-text
+- URL-heavy clipboard → URL tracker removal
+- Table-like clipboard → Markdown table or clean text
+- Plain text → text cleanup
+
+### Image OCR
+
+- Uses Apple Vision locally; no image leaves your Mac.
+- Outputs plain text or Markdown with detected structure.
+- Reconstructs table grids from bounding box spatial analysis.
+- Detects heading levels (H1/H2/H3) from relative font size.
+- Detects bold text from pixel stroke density.
+- Handles two-column layouts by processing columns sequentially.
+- Configurable recognition languages and minimum confidence threshold.
+- Correct error when invoked with no image on clipboard.
+
+### Clean Text
+
+- Normalizes whitespace.
+- Removes safe invisible/control characters.
+- Collapses repeated blank lines.
+- Joins common wrapped paragraph text.
+- Repairs common PDF hyphenated line breaks.
+- Preserves basic email structure.
+- Removes repeated short header/footer noise.
+
+### Markdown
+
+- Converts PDF/web text to conservative Markdown.
+- Reads browser clipboard HTML to preserve headings, links, bold, italic, lists, quotes, code blocks, and tables.
+- Uses SwiftSoup for DOM-based HTML parsing.
+- Cleans tracking parameters from converted links.
+- Includes an `llm` preset for compact, token-conscious output.
+
+### Clean URL
+
+- Removes common tracking parameters (`utm_*`, `fbclid`, `gclid`, `mc_cid`, `mc_eid`, and more).
+- Preserves meaningful query parameters.
+- Supports multiple URLs in a single clipboard.
+
+### Table Conversion (CLI / Quick Picker)
+
+- Converts TSV-like and CSV-like text to Markdown, CSV, or TSV.
 
 Open issues and planned improvements are tracked on [GitHub Issues](https://github.com/danielecostarella/tangle/issues).
 

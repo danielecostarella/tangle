@@ -1,7 +1,8 @@
 import Foundation
 
 public enum TransformationKind: String, Sendable, CaseIterable {
-    case smart
+    case smart          // Smart markdown (image → OCR MD, HTML → MD, table → MD, text → clean)
+    case smartText      // Smart plain text (image → OCR text, HTML → stripped, text → clean)
     case cleanText
     case cleanURL
     case markdown
@@ -27,6 +28,20 @@ public struct TangleTransformer: Sendable {
     public func transformContent(_ input: ClipboardContent, kind: TransformationKind) throws -> String {
         if case .smart = kind {
             return try transformContent(input, kind: SmartClipboardDetector().detect(input).recommendedTransformation)
+        }
+
+        if case .smartText = kind {
+            // Image-only clipboard → OCR plain text
+            if input.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let imageData = input.imageData {
+                return try imageOCRTransformer.extractText(from: imageData)
+            }
+            // URL-heavy → clean URL
+            if SmartClipboardDetector().detect(input).kind == .url {
+                return transform(input.text, kind: .cleanURL)
+            }
+            // Everything else → clean text
+            return TextCleaner(paragraphPreservation: settings.paragraphPreservation).clean(input.text)
         }
 
         if case .markdown = kind, let html = input.html?.nonEmptyHTML {
@@ -56,7 +71,7 @@ public struct TangleTransformer: Sendable {
         }
 
         switch kind {
-        case .smart:
+        case .smart, .smartText:
             return transform(input, kind: .cleanText)
         case .cleanText, .plainPaste:
             return TextCleaner(paragraphPreservation: settings.paragraphPreservation).clean(input)
