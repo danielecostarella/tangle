@@ -11,7 +11,7 @@ It sits in the menu bar, reads the current text clipboard, applies predictable l
 - `TangleCore`: local transformation logic, clipboard access, and settings persistence.
 - `TangleGUI`: native SwiftUI menu bar app.
 - `tangle`: command-line interface for scripting and automation.
-- 48 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, image Markdown formatting, and table formatting.
+- 50 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, image Markdown formatting, and table formatting.
 
 ## Requirements
 
@@ -230,6 +230,7 @@ swift run tangle markdown
 swift run tangle markdown --preset llm --stats
 swift run tangle image --clipboard --to markdown
 swift run tangle image screenshot.png --to text
+swift run tangle image screenshot.png --to markdown --languages en-US,it-IT --confidence 0.35
 swift run tangle table --to markdown
 swift run tangle table --to csv
 pbpaste | swift run tangle url | pbcopy
@@ -275,6 +276,8 @@ Implemented in this first version:
   - Reads copied images from the macOS clipboard or image files from the CLI.
   - Uses Apple Vision locally to recognize text.
   - Outputs plain OCR text or conservative Markdown.
+  - Supports configurable OCR languages and minimum confidence filtering.
+  - Handles simple multi-column layouts by processing detected columns sequentially.
   - Detects image-only clipboard content in Smart Transform.
 - Smart Transform
   - Detects URL-heavy, table-like, rich HTML, code-like, Markdown-like, and plain text clipboard content.

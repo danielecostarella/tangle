@@ -17,6 +17,8 @@ final class SettingsStoreTests: XCTestCase {
             autoPasteAfterTransform: true,
             autoTransformOnCopy: true,
             autoTransformConfidenceThreshold: 0.9,
+            ocrMinimumConfidence: 0.55,
+            ocrRecognitionLanguages: ["it-IT", "en-US"],
             paragraphPreservation: .aggressive,
             markdownPreset: .standard,
             shortcutKeys: [
@@ -52,6 +54,8 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(settings.autoPasteAfterTransform)
         XCTAssertFalse(settings.autoTransformOnCopy)
         XCTAssertEqual(settings.autoTransformConfidenceThreshold, 0.75)
+        XCTAssertEqual(settings.ocrMinimumConfidence, 0.35)
+        XCTAssertEqual(settings.ocrRecognitionLanguages, ["en-US", "it-IT"])
         XCTAssertEqual(settings.paragraphPreservation, .conservative)
         XCTAssertEqual(settings.markdownPreset, .llm)
         XCTAssertEqual(settings.shortcutKeys, TangleSettings.defaultShortcutKeys)

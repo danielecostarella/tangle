@@ -43,6 +43,8 @@ public struct TangleSettings: Codable, Equatable, Sendable {
     public var autoPasteAfterTransform: Bool
     public var autoTransformOnCopy: Bool
     public var autoTransformConfidenceThreshold: Double
+    public var ocrMinimumConfidence: Float
+    public var ocrRecognitionLanguages: [String]
     public var paragraphPreservation: ParagraphPreservation
     public var markdownPreset: MarkdownPreset
     public var shortcutKeys: [TangleShortcutAction: TangleShortcutKey]
@@ -54,6 +56,8 @@ public struct TangleSettings: Codable, Equatable, Sendable {
         autoPasteAfterTransform: Bool = false,
         autoTransformOnCopy: Bool = false,
         autoTransformConfidenceThreshold: Double = 0.75,
+        ocrMinimumConfidence: Float = 0.35,
+        ocrRecognitionLanguages: [String] = ["en-US", "it-IT"],
         paragraphPreservation: ParagraphPreservation = .balanced,
         markdownPreset: MarkdownPreset = .llm,
         shortcutKeys: [TangleShortcutAction: TangleShortcutKey] = TangleSettings.defaultShortcutKeys,
@@ -64,6 +68,8 @@ public struct TangleSettings: Codable, Equatable, Sendable {
         self.autoPasteAfterTransform = autoPasteAfterTransform
         self.autoTransformOnCopy = autoTransformOnCopy
         self.autoTransformConfidenceThreshold = autoTransformConfidenceThreshold
+        self.ocrMinimumConfidence = ocrMinimumConfidence
+        self.ocrRecognitionLanguages = ocrRecognitionLanguages
         self.paragraphPreservation = paragraphPreservation
         self.markdownPreset = markdownPreset
         self.shortcutKeys = shortcutKeys
@@ -76,6 +82,8 @@ public struct TangleSettings: Codable, Equatable, Sendable {
         case autoPasteAfterTransform
         case autoTransformOnCopy
         case autoTransformConfidenceThreshold
+        case ocrMinimumConfidence
+        case ocrRecognitionLanguages
         case paragraphPreservation
         case markdownPreset
         case shortcutKeys
@@ -90,6 +98,8 @@ public struct TangleSettings: Codable, Equatable, Sendable {
         autoPasteAfterTransform = try container.decodeIfPresent(Bool.self, forKey: .autoPasteAfterTransform) ?? false
         autoTransformOnCopy = try container.decodeIfPresent(Bool.self, forKey: .autoTransformOnCopy) ?? false
         autoTransformConfidenceThreshold = try container.decodeIfPresent(Double.self, forKey: .autoTransformConfidenceThreshold) ?? 0.75
+        ocrMinimumConfidence = try container.decodeIfPresent(Float.self, forKey: .ocrMinimumConfidence) ?? 0.35
+        ocrRecognitionLanguages = try container.decodeIfPresent([String].self, forKey: .ocrRecognitionLanguages) ?? ["en-US", "it-IT"]
         paragraphPreservation = try container.decodeIfPresent(ParagraphPreservation.self, forKey: .paragraphPreservation) ?? .balanced
         markdownPreset = try container.decodeIfPresent(MarkdownPreset.self, forKey: .markdownPreset) ?? .llm
         shortcutKeys = try container.decodeIfPresent([TangleShortcutAction: TangleShortcutKey].self, forKey: .shortcutKeys) ?? TangleSettings.defaultShortcutKeys

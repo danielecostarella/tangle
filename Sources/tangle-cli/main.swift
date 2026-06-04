@@ -191,6 +191,12 @@ struct Image: ParsableCommand {
     @Option(help: "Output format: text or markdown.")
     var to: ImageOutputOption = .markdown
 
+    @Option(help: "Minimum OCR confidence, from 0.0 to 1.0.")
+    var confidence: Float = 0.35
+
+    @Option(help: "Comma-separated OCR languages, for example en-US,it-IT.")
+    var languages = "en-US,it-IT"
+
     @Flag(help: "Print character count to stderr.")
     var stats = false
 
@@ -209,7 +215,14 @@ struct Image: ParsableCommand {
             throw ClipboardError.noSupportedContentOnClipboard
         }
 
-        let transformer = ImageOCRTransformer()
+        let recognitionLanguages = languages
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let transformer = ImageOCRTransformer(
+            minimumConfidence: confidence,
+            recognitionLanguages: recognitionLanguages.isEmpty ? ["en-US", "it-IT"] : recognitionLanguages
+        )
         let output: String
         switch to {
         case .text:

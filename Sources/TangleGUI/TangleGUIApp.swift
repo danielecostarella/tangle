@@ -183,32 +183,59 @@ final class TangleAppModel: ObservableObject {
         quickTransformPanel.show(model: self)
     }
 
-    func quickTransformOptions() throws -> QuickTransformState {
+    func quickTransformOptions() async throws -> QuickTransformState {
         let input = try clipboard.readContent()
         let detection = SmartClipboardDetector().detect(input)
-        let kinds: [TransformationKind] = [
-            .smart,
-            .cleanText,
-            .cleanURL,
-            .markdown,
-            .imageText,
-            .imageMarkdown,
-            .tableMarkdown,
-            .tableCSV,
-            .tableTSV,
-            .plainPaste
-        ]
-        let options = try kinds.map { kind in
-            let output = try TangleTransformer(settings: settings).transformContent(input, kind: kind)
-            return QuickTransformOption(
-                kind: kind,
-                input: input,
-                output: output,
-                isRecommended: kind == detection.recommendedTransformation || (kind == .smart && detection.confidence >= 0.75)
-            )
-        }
+        let settings = settings
 
-        return QuickTransformState(detection: detection, options: options)
+        return try await Task.detached(priority: .userInitiated) {
+            let kinds: [TransformationKind] = [
+                .smart,
+                .cleanText,
+                .cleanURL,
+                .markdown,
+                .imageText,
+                .imageMarkdown,
+                .tableMarkdown,
+                .tableCSV,
+                .tableTSV,
+                .plainPaste
+            ]
+            let transformer = TangleTransformer(settings: settings)
+            let imageOCRLines = try input.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? input.imageData.map {
+                    try ImageOCRTransformer(
+                        minimumConfidence: settings.ocrMinimumConfidence,
+                        recognitionLanguages: settings.ocrRecognitionLanguages
+                    ).recognizeLines(in: $0)
+                }
+                : nil
+            let imageFormatter = ImageMarkdownFormatter()
+            let options = try kinds.map { kind in
+                let output: String
+                if let imageOCRLines {
+                    switch kind {
+                    case .smart, .imageMarkdown:
+                        output = imageFormatter.markdown(from: imageOCRLines)
+                    case .imageText:
+                        output = imageFormatter.plainText(from: imageOCRLines)
+                    default:
+                        output = try transformer.transformContent(input, kind: kind)
+                    }
+                } else {
+                    output = try transformer.transformContent(input, kind: kind)
+                }
+
+                return QuickTransformOption(
+                    kind: kind,
+                    input: input,
+                    output: output,
+                    isRecommended: kind == detection.recommendedTransformation || (kind == .smart && detection.confidence >= 0.75)
+                )
+            }
+
+            return QuickTransformState(detection: detection, options: options)
+        }.value
     }
 
     func applyQuickTransform(_ option: QuickTransformOption) {
@@ -458,12 +485,12 @@ struct TransformPreview: Equatable {
     }
 }
 
-struct QuickTransformState {
+struct QuickTransformState: Sendable {
     let detection: SmartClipboardDetection
     let options: [QuickTransformOption]
 }
 
-struct QuickTransformOption: Identifiable {
+struct QuickTransformOption: Identifiable, Sendable {
     var id: TransformationKind { kind }
     let kind: TransformationKind
     let input: ClipboardContent
@@ -539,7 +566,7 @@ struct QuickTransformPickerView: View {
                             .foregroundStyle(.secondary)
 
                         HStack(spacing: 10) {
-                            PreviewTextPane(title: "Before", text: truncated(selectedOption.input.text))
+                            PreviewContentPane(title: "Before", option: selectedOption, text: truncated(selectedOption.input.previewText))
                             PreviewTextPane(title: "After", text: truncated(selectedOption.output))
                         }
                     }
@@ -603,12 +630,14 @@ struct QuickTransformPickerView: View {
     }
 
     private func load() {
-        do {
-            let state = try model.quickTransformOptions()
-            self.state = state
-            selectedKind = state.options.first(where: \.isRecommended)?.kind ?? state.options.first?.kind ?? .smart
-        } catch {
-            errorMessage = error.localizedDescription
+        Task {
+            do {
+                let state = try await model.quickTransformOptions()
+                self.state = state
+                selectedKind = state.options.first(where: \.isRecommended)?.kind ?? state.options.first?.kind ?? .smart
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -669,6 +698,35 @@ struct SettingsView: View {
                         Text("LLM").tag(MarkdownPreset.llm)
                         Text("Standard").tag(MarkdownPreset.standard)
                     }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Slider(
+                            value: Binding {
+                                Double(model.settings.ocrMinimumConfidence)
+                            } set: { newValue in
+                                model.settings.ocrMinimumConfidence = Float(newValue)
+                            },
+                            in: 0.1...0.9,
+                            step: 0.05
+                        )
+
+                        Text("OCR confidence: \(Double(model.settings.ocrMinimumConfidence).formatted(.number.precision(.fractionLength(2))))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    TextField(
+                        "OCR languages",
+                        text: Binding {
+                            model.settings.ocrRecognitionLanguages.joined(separator: ", ")
+                        } set: { newValue in
+                            let languages = newValue
+                                .split(separator: ",")
+                                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                                .filter { !$0.isEmpty }
+                            model.settings.ocrRecognitionLanguages = languages.isEmpty ? ["en-US", "it-IT"] : languages
+                        }
+                    )
                 }
 
                 Section("Status") {
@@ -807,6 +865,38 @@ struct PreviewTextPane: View {
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)
+            }
+            .frame(minHeight: 240)
+            .background(Color(nsColor: .textBackgroundColor))
+            .border(.separator)
+        }
+    }
+}
+
+struct PreviewContentPane: View {
+    let title: String
+    let option: QuickTransformOption
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.headline)
+
+            ScrollView {
+                if option.input.hasImage, let imageData = option.input.imageData, let image = NSImage(data: imageData) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity)
+                        .padding(10)
+                } else {
+                    Text(text.isEmpty ? " " : text)
+                        .font(.system(.body, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                }
             }
             .frame(minHeight: 240)
             .background(Color(nsColor: .textBackgroundColor))

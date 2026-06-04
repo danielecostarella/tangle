@@ -29,7 +29,13 @@ public struct OCRTextLine: Sendable, Equatable {
 }
 
 public struct ImageOCRTransformer: Sendable {
-    public init() {}
+    public var minimumConfidence: Float
+    public var recognitionLanguages: [String]
+
+    public init(minimumConfidence: Float = 0.35, recognitionLanguages: [String] = ["en-US", "it-IT"]) {
+        self.minimumConfidence = minimumConfidence
+        self.recognitionLanguages = recognitionLanguages
+    }
 
     public func recognizeLines(in imageData: Data) throws -> [OCRTextLine] {
         guard let image = NSImage(data: imageData),
@@ -40,6 +46,7 @@ public struct ImageOCRTransformer: Sendable {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
+        request.recognitionLanguages = recognitionLanguages
 
         let handler = VNImageRequestHandler(cgImage: cgImage)
         try handler.perform([request])
@@ -48,7 +55,7 @@ public struct ImageOCRTransformer: Sendable {
             .compactMap { observation -> OCRTextLine? in
                 guard let candidate = observation.topCandidates(1).first else { return nil }
                 let text = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !text.isEmpty else { return nil }
+                guard !text.isEmpty, candidate.confidence >= minimumConfidence else { return nil }
                 return OCRTextLine(text: text, confidence: candidate.confidence, boundingBox: observation.boundingBox)
             }
 
@@ -72,13 +79,27 @@ public struct ImageMarkdownFormatter: Sendable {
     public init() {}
 
     public func readingOrder(_ lines: [OCRTextLine]) -> [OCRTextLine] {
-        lines.sorted { lhs, rhs in
+        let sorted = lines.sorted { lhs, rhs in
             let yDelta = abs(lhs.boundingBox.midY - rhs.boundingBox.midY)
             if yDelta > 0.015 {
                 return lhs.boundingBox.midY > rhs.boundingBox.midY
             }
 
             return lhs.boundingBox.minX < rhs.boundingBox.minX
+        }
+
+        let columns = columnClusters(in: sorted)
+        guard columns.count > 1 else { return sorted }
+
+        return columns.flatMap { column in
+            column.sorted { lhs, rhs in
+                let yDelta = abs(lhs.boundingBox.midY - rhs.boundingBox.midY)
+                if yDelta > 0.015 {
+                    return lhs.boundingBox.midY > rhs.boundingBox.midY
+                }
+
+                return lhs.boundingBox.minX < rhs.boundingBox.minX
+            }
         }
     }
 
@@ -117,8 +138,8 @@ public struct ImageMarkdownFormatter: Sendable {
             return text
         }
 
-        if looksLikeHeading(text, height: line.boundingBox.height, medianHeight: medianHeight) {
-            return "## \(text)"
+        if let headingLevel = headingLevel(for: text, height: line.boundingBox.height, medianHeight: medianHeight) {
+            return "\(String(repeating: "#", count: headingLevel)) \(text)"
         }
 
         return text
@@ -129,8 +150,8 @@ public struct ImageMarkdownFormatter: Sendable {
 
         for block in blocks where !block.isEmpty {
             let previous = output.last ?? ""
-            let needsBlankLine = block.hasPrefix("## ")
-                || previous.hasPrefix("## ")
+            let needsBlankLine = block.isMarkdownHeading
+                || previous.isMarkdownHeading
                 || (block.hasPrefix("- ") != previous.hasPrefix("- "))
 
             if needsBlankLine, !previous.isEmpty {
@@ -150,22 +171,48 @@ public struct ImageMarkdownFormatter: Sendable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func looksLikeHeading(_ text: String, height: CGFloat, medianHeight: CGFloat) -> Bool {
+    private func headingLevel(for text: String, height: CGFloat, medianHeight: CGFloat) -> Int? {
         let words = text.split(whereSeparator: \.isWhitespace)
         guard (1...10).contains(words.count),
               !text.hasSuffix("."),
               text.count >= 4 else {
-            return false
+            return nil
         }
 
         if medianHeight > 0, height >= medianHeight * 1.25 {
-            return true
+            let ratio = height / medianHeight
+            if ratio >= 2.0 { return 1 }
+            if ratio >= 1.5 { return 2 }
+            return 3
         }
 
         let letters = text.filter(\.isLetter)
-        guard letters.count >= 4 else { return false }
+        guard letters.count >= 4 else { return nil }
         let uppercaseLetters = letters.filter(\.isUppercase)
-        return Double(uppercaseLetters.count) / Double(max(letters.count, 1)) > 0.75
+        return Double(uppercaseLetters.count) / Double(max(letters.count, 1)) > 0.75 ? 2 : nil
+    }
+
+    private func columnClusters(in lines: [OCRTextLine]) -> [[OCRTextLine]] {
+        guard lines.count >= 4 else { return [lines] }
+
+        let sortedByX = lines.sorted { $0.boundingBox.midX < $1.boundingBox.midX }
+        let largestGap = zip(sortedByX, sortedByX.dropFirst())
+            .map { lhs, rhs in (gap: rhs.boundingBox.minX - lhs.boundingBox.maxX, splitX: (lhs.boundingBox.maxX + rhs.boundingBox.minX) / 2) }
+            .max { $0.gap < $1.gap }
+
+        guard let largestGap, largestGap.gap > 0.15 else { return [lines] }
+
+        let left = lines.filter { $0.boundingBox.midX < largestGap.splitX }
+        let right = lines.filter { $0.boundingBox.midX >= largestGap.splitX }
+        guard left.count >= 2, right.count >= 2 else { return [lines] }
+
+        return [left, right]
+    }
+}
+
+private extension String {
+    var isMarkdownHeading: Bool {
+        range(of: #"^#{1,6}\s+"#, options: .regularExpression) != nil
     }
 }
 

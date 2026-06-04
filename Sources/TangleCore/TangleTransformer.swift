@@ -37,11 +37,11 @@ public struct TangleTransformer: Sendable {
         }
 
         if case .imageText = kind, let imageData = input.imageData {
-            return try ImageOCRTransformer().extractText(from: imageData)
+            return try imageOCRTransformer.extractText(from: imageData)
         }
 
         if case .imageMarkdown = kind, let imageData = input.imageData {
-            return try ImageOCRTransformer().extractMarkdown(from: imageData)
+            return try imageOCRTransformer.extractMarkdown(from: imageData)
         }
 
         return transform(input.text, kind: kind)
@@ -77,6 +77,15 @@ public struct TangleTransformer: Sendable {
         case .tableTSV:
             return TableConverter().convert(input, to: .tsv)
         }
+    }
+}
+
+private extension TangleTransformer {
+    var imageOCRTransformer: ImageOCRTransformer {
+        ImageOCRTransformer(
+            minimumConfidence: settings.ocrMinimumConfidence,
+            recognitionLanguages: settings.ocrRecognitionLanguages
+        )
     }
 }
 

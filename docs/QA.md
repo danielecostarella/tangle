@@ -146,9 +146,24 @@ Expected:
 - Extract Text from Image writes readable plain text.
 - Convert Image to Markdown emits conservative Markdown.
 - Obvious headings and bullets are preserved when Vision recognizes them clearly.
+- Low-confidence noise from UI chrome or watermarks is filtered out.
 - If no text is recognized, Tangle shows an error instead of clearing useful clipboard text silently.
 
 Repeat once with a screenshot from a slide and once with a scanned/PDF image crop.
+
+### OCR Languages and Columns
+
+1. Set OCR languages to `en-US, it-IT` in Settings.
+2. Copy an Italian screenshot with accented text.
+3. Convert Image to Markdown.
+4. Copy a two-column slide or article screenshot.
+5. Convert Image to Markdown.
+
+Expected:
+
+- Italian accents and word boundaries are preserved better than English-only recognition.
+- Obvious two-column layouts are read column-by-column, not row-interleaved.
+- Large title-like OCR lines become `#`, section headings become `##`, and smaller headings become `###` when relative line size is clear.
 
 ## Auto-paste Smoke Test
 
