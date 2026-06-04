@@ -36,12 +36,18 @@ public struct TangleTransformer: Sendable {
                let imageData = input.imageData {
                 return try imageOCRTransformer.extractText(from: imageData)
             }
-            // URL-heavy → clean URL
-            if SmartClipboardDetector().detect(input).kind == .url {
+            // Detect the text content type directly (ignoring HTML) so that TSV
+            // from Excel stays as TSV even when the clipboard also carries an HTML table.
+            let textKind = SmartClipboardDetector().detect(input.text).kind
+            switch textKind {
+            case .url:
                 return transform(input.text, kind: .cleanURL)
+            case .table:
+                // Tabs are meaningful in TSV — just trim, do not flatten
+                return input.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            default:
+                return TextCleaner(paragraphPreservation: settings.paragraphPreservation).clean(input.text)
             }
-            // Everything else → clean text
-            return TextCleaner(paragraphPreservation: settings.paragraphPreservation).clean(input.text)
         }
 
         if case .markdown = kind, let html = input.html?.nonEmptyHTML {

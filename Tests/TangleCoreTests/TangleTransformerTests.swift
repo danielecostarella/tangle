@@ -45,4 +45,33 @@ final class TangleTransformerTests: XCTestCase {
 
         XCTAssertEqual(output, "Hello, Tangle")
     }
+
+    // MARK: - Excel clipboard simulation
+
+    func testExcelTSVPasteMarkdownProducesTable() throws {
+        // Excel copies TSV as plain text + HTML table as rich content
+        let tsv = "Product\tQ1\tQ2\nWidget A\t12,400\t15,200\nWidget B\t8,700\t9,100"
+        let html = "<table><tr><th>Product</th><th>Q1</th><th>Q2</th></tr><tr><td><b>Widget A</b></td><td>12,400</td><td>15,200</td></tr><tr><td><b>Widget B</b></td><td>8,700</td><td>9,100</td></tr></table>"
+
+        // When HTML is present (real Excel copy), smart uses HTML→Markdown
+        let withHTML = ClipboardContent(text: tsv, html: html)
+        let mdFromHTML = try TangleTransformer().transformContent(withHTML, kind: .smart)
+        XCTAssertTrue(mdFromHTML.contains("| Product |"), "Should produce markdown table from HTML")
+        XCTAssertTrue(mdFromHTML.contains("**Widget A**"), "Should preserve bold from HTML")
+
+        // When only TSV is present (e.g. paste from Numbers without HTML), smart detects table
+        let tsvOnly = ClipboardContent(text: tsv)
+        let mdFromTSV = try TangleTransformer().transformContent(tsvOnly, kind: .smart)
+        XCTAssertTrue(mdFromTSV.contains("| Product |"), "Should produce markdown table from TSV")
+    }
+
+    func testExcelTSVPasteCleanTextKeepsStructure() throws {
+        // Paste Clean Text on a table should not flatten it to a word soup
+        let tsv = "Name\tRevenue\nAcme\t100000\nBeta\t80000"
+        let content = ClipboardContent(text: tsv)
+        let output = try TangleTransformer().transformContent(content, kind: .smartText)
+        // Should NOT collapse to a single line
+        XCTAssertTrue(output.contains("Acme"), "Should preserve cell content")
+        XCTAssertFalse(output == "Name Revenue Acme 100000 Beta 80000", "Should not flatten to a single line")
+    }
 }
