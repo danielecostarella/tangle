@@ -189,18 +189,6 @@ final class TangleAppModel: ObservableObject {
         let settings = settings
 
         return try await Task.detached(priority: .userInitiated) {
-            let kinds: [TransformationKind] = [
-                .smart,
-                .cleanText,
-                .cleanURL,
-                .markdown,
-                .imageText,
-                .imageMarkdown,
-                .tableMarkdown,
-                .tableCSV,
-                .tableTSV,
-                .plainPaste
-            ]
             let transformer = TangleTransformer(settings: settings)
             let imageOCRLines = try input.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? input.imageData.map {
@@ -210,6 +198,9 @@ final class TangleAppModel: ObservableObject {
                     ).recognizeLines(in: $0)
                 }
                 : nil
+            let kinds: [TransformationKind] = imageOCRLines != nil
+                ? [.smart, .imageText, .imageMarkdown]
+                : [.smart, .cleanText, .cleanURL, .markdown, .imageText, .imageMarkdown, .tableMarkdown, .tableCSV, .tableTSV, .plainPaste]
             let imageFormatter = ImageMarkdownFormatter()
             let options = try kinds.map { kind in
                 let output: String
@@ -710,23 +701,26 @@ struct SettingsView: View {
                             step: 0.05
                         )
 
-                        Text("OCR confidence: \(Double(model.settings.ocrMinimumConfidence).formatted(.number.precision(.fractionLength(2))))")
+                        Text("OCR minimum confidence: \(Double(model.settings.ocrMinimumConfidence).formatted(.number.precision(.fractionLength(2)))) — lower captures more text, higher skips uncertain lines")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
 
-                    TextField(
-                        "OCR languages",
-                        text: Binding {
-                            model.settings.ocrRecognitionLanguages.joined(separator: ", ")
-                        } set: { newValue in
-                            let languages = newValue
-                                .split(separator: ",")
-                                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                                .filter { !$0.isEmpty }
-                            model.settings.ocrRecognitionLanguages = languages.isEmpty ? ["en-US", "it-IT"] : languages
-                        }
-                    )
+                    LabeledContent("OCR languages") {
+                        TextField(
+                            "e.g. en-US, it-IT",
+                            text: Binding {
+                                model.settings.ocrRecognitionLanguages.joined(separator: ", ")
+                            } set: { newValue in
+                                let languages = newValue
+                                    .split(separator: ",")
+                                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                                    .filter { !$0.isEmpty }
+                                model.settings.ocrRecognitionLanguages = languages.isEmpty ? ["en-US", "it-IT"] : languages
+                            }
+                        )
+                        .frame(maxWidth: 200)
+                    }
                 }
 
                 Section("Status") {
@@ -884,7 +878,12 @@ struct PreviewContentPane: View {
                 .font(.headline)
 
             ScrollView {
-                if option.input.hasImage, let imageData = option.input.imageData, let image = NSImage(data: imageData) {
+                let showImagePreview = option.input.hasImage
+                    && (option.kind == .imageText || option.kind == .imageMarkdown
+                        || option.input.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if showImagePreview,
+                   let imageData = option.input.imageData,
+                   let image = NSImage(data: imageData) {
                     Image(nsImage: image)
                         .resizable()
                         .scaledToFit()
