@@ -157,7 +157,7 @@ final class TangleAppModel: ObservableObject {
             let output = try TangleTransformer(settings: settings).transformContent(input, kind: kind)
             try clipboard.writeText(output)
 
-            let savings = input.text.count - output.count
+            let savings = input.hasImage && input.text.isEmpty ? 0 : input.text.count - output.count
             lastCharacterSavings = savings
             lastPreview = TransformPreview(kind: kind, input: input.previewText, output: output)
             statusMessage = statusText(message: message, savings: savings)
@@ -189,34 +189,45 @@ final class TangleAppModel: ObservableObject {
         let settings = settings
 
         return try await Task.detached(priority: .userInitiated) {
-            let transformer = TangleTransformer(settings: settings)
-            let imageOCRLines = try input.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? input.imageData.map {
-                    try ImageOCRTransformer(
-                        minimumConfidence: settings.ocrMinimumConfidence,
-                        recognitionLanguages: settings.ocrRecognitionLanguages
-                    ).recognizeLines(in: $0)
+            let textIsEmpty = input.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let ocrTransformer = ImageOCRTransformer(
+                minimumConfidence: settings.ocrMinimumConfidence,
+                recognitionLanguages: settings.ocrRecognitionLanguages
+            )
+            // Image-only: throw on OCR failure (picker shows error — nothing else to offer).
+            // Mixed: catch OCR failure so text transforms still load.
+            var imageOCRLines: [OCRTextLine]?
+            if let imageData = input.imageData {
+                if textIsEmpty {
+                    imageOCRLines = try ocrTransformer.recognizeLines(in: imageData)
+                } else {
+                    imageOCRLines = try? ocrTransformer.recognizeLines(in: imageData)
                 }
-                : nil
-            let kinds: [TransformationKind] = imageOCRLines != nil
-                ? [.smart, .imageText, .imageMarkdown]
-                : [.smart, .cleanText, .cleanURL, .markdown, .imageText, .imageMarkdown, .tableMarkdown, .tableCSV, .tableTSV, .plainPaste]
+            }
+            // Hide image transforms when clipboard has no image at all.
+            let kinds: [TransformationKind]
+            if textIsEmpty {
+                kinds = [.smart, .imageText, .imageMarkdown]
+            } else if input.hasImage {
+                kinds = [.smart, .cleanText, .cleanURL, .markdown, .imageText, .imageMarkdown,
+                         .tableMarkdown, .tableCSV, .tableTSV, .plainPaste]
+            } else {
+                kinds = [.smart, .cleanText, .cleanURL, .markdown, .tableMarkdown, .tableCSV, .tableTSV, .plainPaste]
+            }
             let imageFormatter = ImageMarkdownFormatter()
+            let transformer = TangleTransformer(settings: settings)
             let options = try kinds.map { kind in
                 let output: String
-                if let imageOCRLines {
-                    switch kind {
-                    case .smart, .imageMarkdown:
-                        output = imageFormatter.markdown(from: imageOCRLines)
-                    case .imageText:
-                        output = imageFormatter.plainText(from: imageOCRLines)
-                    default:
-                        output = try transformer.transformContent(input, kind: kind)
-                    }
-                } else {
+                switch kind {
+                case .smart where textIsEmpty:
+                    output = imageOCRLines.map { imageFormatter.markdown(from: $0) } ?? ""
+                case .imageText:
+                    output = imageOCRLines.map { imageFormatter.plainText(from: $0) } ?? ""
+                case .imageMarkdown:
+                    output = imageOCRLines.map { imageFormatter.markdown(from: $0) } ?? ""
+                default:
                     output = try transformer.transformContent(input, kind: kind)
                 }
-
                 return QuickTransformOption(
                     kind: kind,
                     input: input,
@@ -224,7 +235,6 @@ final class TangleAppModel: ObservableObject {
                     isRecommended: kind == detection.recommendedTransformation || (kind == .smart && detection.confidence >= 0.75)
                 )
             }
-
             return QuickTransformState(detection: detection, options: options)
         }.value
     }
@@ -633,6 +643,9 @@ struct QuickTransformPickerView: View {
     }
 
     private func optionStatsLine(_ option: QuickTransformOption) -> String {
+        if option.input.hasImage, option.input.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "\(option.output.count) chars extracted"
+        }
         let charWord = option.stats.characterDelta >= 0 ? "saved" : "added"
         let tokenWord = option.stats.estimatedTokenDelta >= 0 ? "saved" : "added"
         return "\(abs(option.stats.characterDelta)) chars \(charWord) · ~\(abs(option.stats.estimatedTokenDelta)) tokens \(tokenWord)"

@@ -36,11 +36,13 @@ public struct TangleTransformer: Sendable {
             ).transform(html: html, fallbackText: input.text)
         }
 
-        if case .imageText = kind, let imageData = input.imageData {
+        if case .imageText = kind {
+            guard let imageData = input.imageData else { throw ImageOCRError.noImageOnClipboard }
             return try imageOCRTransformer.extractText(from: imageData)
         }
 
-        if case .imageMarkdown = kind, let imageData = input.imageData {
+        if case .imageMarkdown = kind {
+            guard let imageData = input.imageData else { throw ImageOCRError.noImageOnClipboard }
             return try imageOCRTransformer.extractMarkdown(from: imageData)
         }
 

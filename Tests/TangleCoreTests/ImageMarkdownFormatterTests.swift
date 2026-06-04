@@ -60,8 +60,9 @@ final class ImageMarkdownFormatterTests: XCTestCase {
 
         let output = ImageMarkdownFormatter().markdown(from: lines)
 
-        XCTAssertTrue(output.contains("# Document Title"))
-        XCTAssertTrue(output.contains("## Section Heading"))
-        XCTAssertTrue(output.contains("### Small Heading"))
+        let outputLines = output.split(separator: "\n").map(String.init)
+        XCTAssertTrue(outputLines.contains("# Document Title"), "Expected H1 for largest text")
+        XCTAssertTrue(outputLines.contains("## Section Heading"), "Expected H2 for mid-size text")
+        XCTAssertTrue(outputLines.contains("### Small Heading"), "Expected H3 for slightly-larger text")
     }
 }

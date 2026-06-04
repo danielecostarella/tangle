@@ -5,6 +5,7 @@ import Vision
 public enum ImageOCRError: Error, LocalizedError {
     case unreadableImage
     case noTextRecognized
+    case noImageOnClipboard
 
     public var errorDescription: String? {
         switch self {
@@ -12,6 +13,8 @@ public enum ImageOCRError: Error, LocalizedError {
             return "The clipboard image could not be read."
         case .noTextRecognized:
             return "No text was recognized in the image."
+        case .noImageOnClipboard:
+            return "No image was found on the clipboard."
         }
     }
 }
@@ -179,17 +182,22 @@ public struct ImageMarkdownFormatter: Sendable {
             return nil
         }
 
+        let letters = text.filter(\.isLetter)
+        let isAllCaps = letters.count >= 4 &&
+            Double(letters.filter(\.isUppercase).count) / Double(letters.count) > 0.75
+
         if medianHeight > 0, height >= medianHeight * 1.25 {
             let ratio = height / medianHeight
-            if ratio >= 2.0 { return 1 }
-            if ratio >= 1.5 { return 2 }
+            // ALL-CAPS + moderately larger → treat as title (H1)
+            if ratio >= 2.0 || (ratio >= 1.3 && isAllCaps) { return 1 }
+            if ratio >= 1.3 { return 2 }
             return 3
         }
 
-        let letters = text.filter(\.isLetter)
-        guard letters.count >= 4 else { return nil }
-        let uppercaseLetters = letters.filter(\.isUppercase)
-        return Double(uppercaseLetters.count) / Double(max(letters.count, 1)) > 0.75 ? 2 : nil
+        // Fallback: pure ALL-CAPS, no height signal.
+        // Require ≥2 words to avoid single-word table labels (e.g. "TOTAL", "Q4").
+        guard letters.count >= 4, words.count >= 2 else { return nil }
+        return isAllCaps ? 2 : nil
     }
 
     private func columnClusters(in lines: [OCRTextLine]) -> [[OCRTextLine]] {
