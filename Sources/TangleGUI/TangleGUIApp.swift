@@ -94,7 +94,10 @@ struct TangleGUIApp: App {
                 }
             }
 
-            SettingsLink {
+            Button {
+                NSApp.activate(ignoringOtherApps: true)
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            } label: {
                 Label("Settings", systemImage: "gearshape")
             }
 
