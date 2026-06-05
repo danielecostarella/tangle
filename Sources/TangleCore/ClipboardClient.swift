@@ -28,12 +28,16 @@ public struct ClipboardClient: Sendable {
         let html = pasteboard.string(forType: .html)
             ?? pasteboard.string(forType: NSPasteboard.PasteboardType("public.html"))
 
+        let pdfData = pasteboard.data(forType: .pdf)
+            ?? pasteboard.data(forType: NSPasteboard.PasteboardType("com.adobe.pdf"))
+        let rtfData = pasteboard.data(forType: .rtf)
+            ?? pasteboard.data(forType: NSPasteboard.PasteboardType("public.rtf"))
         let imageData = pasteboard.tangleImageData()
-        guard !text.isEmpty || imageData != nil else {
+        guard !text.isEmpty || html != nil || pdfData != nil || rtfData != nil || imageData != nil else {
             throw ClipboardError.noSupportedContentOnClipboard
         }
 
-        return ClipboardContent(text: text, html: html, imageData: imageData)
+        return ClipboardContent(text: text, html: html, pdfData: pdfData, rtfData: rtfData, imageData: imageData)
     }
 
     public func readText() throws -> String {
@@ -57,16 +61,24 @@ public struct ClipboardClient: Sendable {
 public struct ClipboardContent: Sendable {
     public var text: String
     public var html: String?
+    public var pdfData: Data?
+    public var rtfData: Data?
     public var imageData: Data?
 
-    public init(text: String, html: String? = nil, imageData: Data? = nil) {
+    public init(text: String, html: String? = nil, pdfData: Data? = nil, rtfData: Data? = nil, imageData: Data? = nil) {
         self.text = text
         self.html = html
+        self.pdfData = pdfData
+        self.rtfData = rtfData
         self.imageData = imageData
     }
 
     public var hasImage: Bool {
         imageData != nil
+    }
+
+    public var hasRichDocument: Bool {
+        pdfData != nil || rtfData != nil
     }
 }
 

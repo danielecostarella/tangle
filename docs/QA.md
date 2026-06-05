@@ -65,6 +65,20 @@ Expected:
 - Hyphenated line breaks are repaired when safe.
 - Paragraph boundaries remain readable.
 
+### PDF/RTF Text Layer
+
+1. Copy selectable text from a PDF where Preview exposes real text, not only an image.
+2. Run Paste Markdown.
+3. Copy styled text from TextEdit, Pages, Word, or Mail that includes bold text and a link.
+4. Run Paste Markdown.
+
+Expected:
+
+- PDF text-layer content is extracted locally before OCR is needed.
+- RTF clipboard content preserves basic inline structure such as bold and links.
+- Tracking parameters in links are cleaned.
+- Paste Clean Text on the same content returns readable plain text without Markdown markers.
+
 ### Table
 
 1. Enable Auto-transform on copy.

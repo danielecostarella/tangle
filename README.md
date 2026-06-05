@@ -11,7 +11,7 @@ It sits in the menu bar. Copy anything — text, a screenshot, an image, Excel c
 - `TangleCore`: local transformation logic, clipboard access, and settings persistence.
 - `TangleGUI`: native SwiftUI menu bar app.
 - `tangle`: command-line interface for scripting and automation.
-- 54 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, image OCR formatting, table detection, and bold formatting.
+- 59 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, image OCR formatting, PDF/RTF clipboard extraction, table detection, and bold formatting.
 
 ## Requirements
 
@@ -63,6 +63,7 @@ The two primary actions cover the most common cases automatically:
 
 **Paste Markdown** (`⌃⌥⌘M`) detects what is on the clipboard and produces the best Markdown output:
 - Image or screenshot → Apple Vision OCR → Markdown with headings, bullets, tables, and bold
+- PDF or RTF clipboard data → local text-layer extraction before OCR
 - Rich HTML (web page, email) → clean Markdown preserving structure
 - Table text or screenshot of a table → Markdown table
 - URL → cleaned URL with tracking parameters removed
@@ -70,6 +71,7 @@ The two primary actions cover the most common cases automatically:
 
 **Paste Clean Text** (`⌃⌥⌘C`) does the same but always produces plain text:
 - Image or screenshot → Apple Vision OCR → plain text
+- PDF or RTF clipboard data → local text extraction
 - Any text → whitespace normalized, line breaks repaired, PDF artifacts removed
 - URL → cleaned URL
 
@@ -265,6 +267,7 @@ Manual QA checklists live in [`docs/QA.md`](docs/QA.md).
 **Paste Markdown** and **Paste Clean Text** detect clipboard content type and route automatically:
 
 - Image-only clipboard → Apple Vision OCR
+- PDF/RTF clipboard → local text-layer extraction
 - Rich HTML clipboard → HTML-to-Markdown or HTML-to-text
 - URL-heavy clipboard → URL tracker removal
 - Table-like clipboard → Markdown table or clean text
@@ -294,6 +297,7 @@ Manual QA checklists live in [`docs/QA.md`](docs/QA.md).
 ### Markdown
 
 - Converts PDF/web text to conservative Markdown.
+- Reads PDF and RTF clipboard data locally when available, avoiding OCR when a text layer exists.
 - Reads browser clipboard HTML to preserve headings, links, bold, italic, lists, quotes, code blocks, and tables.
 - Uses SwiftSoup for DOM-based HTML parsing.
 - Cleans tracking parameters from converted links.

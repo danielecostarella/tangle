@@ -36,6 +36,10 @@ public struct TangleTransformer: Sendable {
                let imageData = input.imageData {
                 return try imageOCRTransformer.extractText(from: imageData)
             }
+            if input.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let documentText = documentPlainText(from: input) {
+                return documentText
+            }
             // Detect the text content type directly (ignoring HTML) so that TSV
             // from Excel stays as TSV even when the clipboard also carries an HTML table.
             let textKind = SmartClipboardDetector().detect(input.text).kind
@@ -55,6 +59,10 @@ public struct TangleTransformer: Sendable {
                 preset: settings.markdownPreset,
                 paragraphPreservation: settings.paragraphPreservation
             ).transform(html: html, fallbackText: input.text)
+        }
+
+        if case .markdown = kind, let documentMarkdown = documentMarkdown(from: input) {
+            return documentMarkdown
         }
 
         if case .imageText = kind {
@@ -109,6 +117,44 @@ private extension TangleTransformer {
             minimumConfidence: settings.ocrMinimumConfidence,
             recognitionLanguages: settings.ocrRecognitionLanguages
         )
+    }
+
+    func documentMarkdown(from input: ClipboardContent) -> String? {
+        let transformer = DocumentMarkdownTransformer()
+        if let rtfData = input.rtfData,
+           let markdown = transformer.transformRTF(
+            data: rtfData,
+            preset: settings.markdownPreset,
+            paragraphPreservation: settings.paragraphPreservation
+           ) {
+            return markdown
+        }
+
+        if let pdfData = input.pdfData,
+           let markdown = transformer.transformPDF(
+            data: pdfData,
+            preset: settings.markdownPreset,
+            paragraphPreservation: settings.paragraphPreservation
+           ) {
+            return markdown
+        }
+
+        return nil
+    }
+
+    func documentPlainText(from input: ClipboardContent) -> String? {
+        let transformer = DocumentMarkdownTransformer()
+        if let rtfData = input.rtfData,
+           let text = transformer.extractRTFText(data: rtfData) {
+            return TextCleaner(paragraphPreservation: settings.paragraphPreservation).clean(text)
+        }
+
+        if let pdfData = input.pdfData,
+           let text = transformer.extractPDFText(data: pdfData) {
+            return TextCleaner(paragraphPreservation: settings.paragraphPreservation).clean(text)
+        }
+
+        return nil
     }
 }
 
