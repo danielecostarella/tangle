@@ -65,6 +65,12 @@ public struct TangleTransformer: Sendable {
             return documentMarkdown
         }
 
+        if case .markdown = kind,
+           input.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let imageData = input.imageData {
+            return try imageOCRTransformer.extractMarkdown(from: imageData)
+        }
+
         if case .imageText = kind {
             guard let imageData = input.imageData else { throw ImageOCRError.noImageOnClipboard }
             return try imageOCRTransformer.extractText(from: imageData)
@@ -137,6 +143,14 @@ private extension TangleTransformer {
             paragraphPreservation: settings.paragraphPreservation
            ) {
             return markdown
+        }
+
+        if let pdfData = input.pdfData {
+            let pages = transformer.rasterizedPDFPages(data: pdfData)
+            let markdownPages = pages.compactMap { try? imageOCRTransformer.extractMarkdown(from: $0) }
+            if !markdownPages.isEmpty {
+                return markdownPages.joined(separator: "\n\n---\n\n")
+            }
         }
 
         return nil

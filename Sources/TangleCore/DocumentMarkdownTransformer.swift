@@ -10,23 +10,42 @@ public struct DocumentMarkdownTransformer: Sendable {
 
         return MarkdownTransformer(
             preset: preset,
-            paragraphPreservation: paragraphPreservation
-        ).transform(text)
+            paragraphPreservation: paragraphPreservation,
+            inferUnmarkedHeadings: false
+        ).transform(structurePDFText(text))
     }
 
     public func extractPDFText(data: Data) -> String? {
         guard let document = PDFDocument(data: data) else { return nil }
 
-        let pageTexts = (0..<document.pageCount).compactMap { index in
-            document.page(at: index)?.string?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let pageLines = (0..<document.pageCount).compactMap { index -> [String]? in
+            guard let text = document.page(at: index)?.string else { return nil }
+            return text
+                .components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
         }
-        let text = pageTexts
+        let cleanedPages = removeRepeatedPageMargins(from: pageLines)
+        let text = cleanedPages
+            .map { $0.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: "\n\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
 
         return text
+    }
+
+    public func rasterizedPDFPages(data: Data, maximumPages: Int = 20) -> [Data] {
+        guard let document = PDFDocument(data: data) else { return [] }
+
+        return (0..<min(document.pageCount, maximumPages)).compactMap { index in
+            guard let page = document.page(at: index) else { return nil }
+            let bounds = page.bounds(for: .mediaBox)
+            let width: CGFloat = 1_800
+            let height = max(width * bounds.height / max(bounds.width, 1), 1)
+            let image = page.thumbnail(of: CGSize(width: width, height: height), for: .mediaBox)
+            return image.tiffRepresentation
+        }
     }
 
     public func transformRTF(data: Data, preset: MarkdownPreset, paragraphPreservation: ParagraphPreservation) -> String? {
@@ -59,6 +78,59 @@ public struct DocumentMarkdownTransformer: Sendable {
         }
 
         return attributed
+    }
+
+    private func removeRepeatedPageMargins(from pages: [[String]]) -> [[String]] {
+        guard pages.count >= 2 else { return pages }
+
+        let marginLines = pages.flatMap { page -> Set<String> in
+            let nonEmpty = page.filter { !$0.isEmpty }
+            return Set(Array(nonEmpty.prefix(3)) + Array(nonEmpty.suffix(3)))
+        }
+        let counts = Dictionary(grouping: marginLines, by: { $0 }).mapValues(\.count)
+        let repeated = Set<String>(counts.compactMap { line, count in
+            guard count >= 2, line.count <= 120 else { return nil }
+            return line
+        })
+
+        return pages.map { page in
+            page.filter { line in
+                if line.range(of: #"^(page\s+)?\d+(\s+of\s+\d+)?$"#, options: [.regularExpression, .caseInsensitive]) != nil {
+                    return false
+                }
+                return !repeated.contains(line)
+            }
+        }
+    }
+
+    private func structurePDFText(_ text: String) -> String {
+        let lines = text.components(separatedBy: "\n")
+        let firstContentIndex = lines.firstIndex { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+
+        return lines.enumerated().map { index, rawLine in
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            guard !line.isEmpty else { return "" }
+
+            if index == firstContentIndex,
+               line.isLikelyPDFTitle(nextLine: lines.dropFirst(index + 1).first) {
+                return "# " + line
+            }
+
+            if let match = line.firstMatch(of: /^(\d+(?:\.\d+)*)[.)]?\s+(.+)$/) {
+                let depth = match.1.split(separator: ".").count
+                let heading = String(match.2)
+                if heading.count <= 100, !heading.hasSuffix(".") {
+                    return String(repeating: "#", count: min(depth + 1, 4)) + " " + heading
+                }
+            }
+
+            if let match = line.firstMatch(of: /^(\d+)[.)]\s+(.+)$/),
+               String(match.2).count > 20 {
+                return "[^\(match.1)]: \(match.2)"
+            }
+
+            return line
+        }.joined(separator: "\n")
     }
 
     private func attributedMarkdown(_ attributed: NSAttributedString) -> String {
@@ -105,6 +177,22 @@ public struct DocumentMarkdownTransformer: Sendable {
 }
 
 private extension String {
+    func isLikelyPDFTitle(nextLine: String?) -> Bool {
+        let words = split(whereSeparator: \.isWhitespace)
+        guard count >= 3,
+              count <= 120,
+              words.count <= 12,
+              !hasSuffix("."),
+              !hasPrefix("#"),
+              !contains(",") else {
+            return false
+        }
+
+        let isAllCaps = uppercased() == self
+        let followedByBlankLine = nextLine?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true
+        return isAllCaps || followedByBlankLine
+    }
+
     var normalizedRTFFragment: String {
         replacingOccurrences(of: "\u{00A0}", with: " ")
             .replacingOccurrences(of: #"[ \t]{2,}"#, with: " ", options: .regularExpression)

@@ -33,6 +33,12 @@ struct TangleGUIApp: App {
             }
             .keyboardShortcut("p")
 
+            Button {
+                model.showClipboardHistory()
+            } label: {
+                Label("Clipboard History    \(model.shortcutDisplay(for: .clipboardHistory))    \(model.historyItems.count)", systemImage: "clock.arrow.circlepath")
+            }
+
             Divider()
 
             Button {
@@ -93,6 +99,7 @@ final class TangleAppModel: ObservableObject {
         didSet {
             store.save(settings)
             registerShortcuts()
+            configureClipboardHistory()
             configurePasteboardPolling()
         }
     }
@@ -101,18 +108,22 @@ final class TangleAppModel: ObservableObject {
     @Published var lastCharacterSavings: Int?
     @Published var lastPreview: TransformPreview?
     @Published var canRestoreOriginalClipboard = false
+    @Published private(set) var historyItems: [ClipboardHistoryItem] = []
 
     private let clipboard = ClipboardClient()
     private let hud = HUDController()
     private let shortcuts = GlobalShortcutManager()
     private let store = SettingsStore()
     private let quickTransformPanel = QuickTransformPanelController()
+    private let clipboardHistoryPanel = ClipboardHistoryPanelController()
     private var pasteboardPollTimer: Timer?
     private var observedPasteboardChangeCount = NSPasteboard.general.changeCount
     private var originalClipboardBeforeAutoTransform: String?
+    private var clipboardHistory = ClipboardHistory()
 
     init() {
         settings = store.load()
+        configureClipboardHistory()
         registerShortcuts()
         configurePasteboardPolling()
     }
@@ -121,7 +132,10 @@ final class TangleAppModel: ObservableObject {
         do {
             let input = try clipboard.readContent()
             let output = try TangleTransformer(settings: settings).transformContent(input, kind: kind)
+            recordClipboardHistory(input)
             try clipboard.writeText(output)
+            observedPasteboardChangeCount = NSPasteboard.general.changeCount
+            recordClipboardHistory(output)
 
             let savings = input.hasImage && input.text.isEmpty ? 0 : input.text.count - output.count
             lastCharacterSavings = savings
@@ -147,6 +161,10 @@ final class TangleAppModel: ObservableObject {
 
     func showQuickTransformPicker() {
         quickTransformPanel.show(model: self)
+    }
+
+    func showClipboardHistory() {
+        clipboardHistoryPanel.show(model: self)
     }
 
     func quickTransformOptions() async throws -> QuickTransformState {
@@ -207,8 +225,10 @@ final class TangleAppModel: ObservableObject {
 
     func applyQuickTransform(_ option: QuickTransformOption) {
         do {
+            recordClipboardHistory(option.input)
             try clipboard.writeText(option.output)
             observedPasteboardChangeCount = NSPasteboard.general.changeCount
+            recordClipboardHistory(option.output)
             lastCharacterSavings = option.stats.characterDelta
             lastPreview = TransformPreview(kind: option.kind, input: option.input.previewText, output: option.output)
             statusMessage = statusText(message: "\(option.kind.displayName) applied", savings: option.stats.characterDelta)
@@ -231,6 +251,27 @@ final class TangleAppModel: ObservableObject {
 
     func cancelQuickTransform() {
         quickTransformPanel.close()
+    }
+
+    func copyHistoryItem(_ item: ClipboardHistoryItem) {
+        do {
+            try clipboard.writeText(item.text)
+            observedPasteboardChangeCount = NSPasteboard.general.changeCount
+            recordClipboardHistory(item.text)
+            statusMessage = "Clipboard history item restored"
+            clipboardHistoryPanel.close()
+            if settings.isHUDEnabled {
+                hud.show(message: statusMessage)
+            }
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func clearClipboardHistory() {
+        clipboardHistory.clear()
+        historyItems = []
+        statusMessage = "Clipboard history cleared"
     }
 
     func restoreOriginalClipboard() {
@@ -300,6 +341,8 @@ final class TangleAppModel: ObservableObject {
 
     private func registerShortcuts() {
         shortcuts.register(shortcutKeys: settings.shortcutKeys) {
+            self.showClipboardHistory()
+        } quickTransformPicker: {
             self.showQuickTransformPicker()
         } cleanClipboard: {
             self.transformClipboard(.smartText, message: "Pasted as clean text")
@@ -316,7 +359,7 @@ final class TangleAppModel: ObservableObject {
         pasteboardPollTimer?.invalidate()
         pasteboardPollTimer = nil
 
-        guard settings.autoTransformOnCopy else { return }
+        guard settings.autoTransformOnCopy || settings.clipboardHistoryEnabled else { return }
 
         observedPasteboardChangeCount = NSPasteboard.general.changeCount
         pasteboardPollTimer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { [weak self] _ in
@@ -331,10 +374,13 @@ final class TangleAppModel: ObservableObject {
         guard changeCount != observedPasteboardChangeCount else { return }
         observedPasteboardChangeCount = changeCount
 
-        guard settings.autoTransformOnCopy,
-              let content = try? clipboard.readContent() else {
+        guard let content = try? clipboard.readContent() else {
             return
         }
+
+        recordClipboardHistory(content)
+
+        guard settings.autoTransformOnCopy else { return }
 
         let detection = SmartClipboardDetector().detect(content)
         guard shouldAutoTransform(content: content, detection: detection) else { return }
@@ -374,6 +420,45 @@ final class TangleAppModel: ObservableObject {
         }
 
         return true
+    }
+
+    private func configureClipboardHistory() {
+        clipboardHistory.limit = settings.clipboardHistoryLimit
+        if !settings.clipboardHistoryEnabled {
+            clipboardHistory.clear()
+        }
+        historyItems = clipboardHistory.items
+    }
+
+    private func recordClipboardHistory(_ content: ClipboardContent) {
+        guard settings.clipboardHistoryEnabled, !content.isSensitive else { return }
+
+        let text: String
+        if !content.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            text = content.text
+        } else if let rtfData = content.rtfData,
+                  let extracted = DocumentMarkdownTransformer().extractRTFText(data: rtfData) {
+            text = extracted
+        } else if let pdfData = content.pdfData,
+                  let extracted = DocumentMarkdownTransformer().extractPDFText(data: pdfData) {
+            text = extracted
+        } else {
+            return
+        }
+
+        recordClipboardHistory(text)
+    }
+
+    private func recordClipboardHistory(_ text: String) {
+        guard settings.clipboardHistoryEnabled,
+              !text.looksLikePasswordFragment,
+              !Self.passwordManagerBundleIdentifiers.contains(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "") else {
+            return
+        }
+
+        if clipboardHistory.record(text) != nil {
+            historyItems = clipboardHistory.items
+        }
     }
 
     private func statusText(message: String, savings: Int) -> String {
@@ -501,6 +586,106 @@ final class QuickTransformPanelController {
     func close() {
         panel?.close()
         panel = nil
+    }
+}
+
+@MainActor
+final class ClipboardHistoryPanelController {
+    private var panel: NSPanel?
+
+    func show(model: TangleAppModel) {
+        let hostingController = NSHostingController(rootView: ClipboardHistoryView(model: model))
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 500),
+            styleMask: [.titled, .closable, .utilityWindow],
+            backing: .buffered,
+            defer: false
+        )
+
+        panel.title = "Tangle Clipboard History"
+        panel.level = .floating
+        panel.center()
+        panel.contentViewController = hostingController
+        panel.isReleasedWhenClosed = false
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        self.panel = panel
+    }
+
+    func close() {
+        panel?.close()
+        panel = nil
+    }
+}
+
+struct ClipboardHistoryView: View {
+    @ObservedObject var model: TangleAppModel
+    @State private var query = ""
+
+    private var filteredItems: [ClipboardHistoryItem] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return model.historyItems }
+        return model.historyItems.filter { $0.text.localizedCaseInsensitiveContains(query) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Clipboard History")
+                    .font(.title2.weight(.semibold))
+
+                Spacer()
+
+                Button(role: .destructive) {
+                    model.clearClipboardHistory()
+                } label: {
+                    Label("Clear", systemImage: "trash")
+                }
+                .disabled(model.historyItems.isEmpty)
+            }
+
+            TextField("Search clipboard history", text: $query)
+                .textFieldStyle(.roundedBorder)
+
+            if !model.settings.clipboardHistoryEnabled {
+                ContentUnavailableView(
+                    "Clipboard History Is Off",
+                    systemImage: "clock.badge.xmark",
+                    description: Text("Enable it in Settings. History stays in memory and is cleared when Tangle quits.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if filteredItems.isEmpty {
+                ContentUnavailableView(
+                    query.isEmpty ? "No Clipboard History" : "No Matches",
+                    systemImage: "clock.arrow.circlepath",
+                    description: Text(query.isEmpty ? "Copy text to add it to this private session history." : "Try a different search.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List(filteredItems) { item in
+                    Button {
+                        model.copyHistoryItem(item)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(item.preview)
+                                .lineLimit(2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(item.capturedAt, style: .relative)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 3)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Text("Session-only · text only · password-like content and password managers are skipped")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .frame(minWidth: 640, minHeight: 500)
     }
 }
 
@@ -657,6 +842,27 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Clipboard History") {
+                    Toggle("Keep session clipboard history", isOn: $model.settings.clipboardHistoryEnabled)
+
+                    if model.settings.clipboardHistoryEnabled {
+                        Picker("Items kept", selection: $model.settings.clipboardHistoryLimit) {
+                            Text("10").tag(10)
+                            Text("20").tag(20)
+                            Text("50").tag(50)
+                        }
+
+                        Text("History is kept only in memory, cleared when Tangle quits or this setting is disabled, and skips password-like text and known password managers.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Button("Clear History", role: .destructive) {
+                            model.clearClipboardHistory()
+                        }
+                        .disabled(model.historyItems.isEmpty)
+                    }
+                }
+
                 Section("Transformations") {
                     Picker("Text cleanup", selection: $model.settings.paragraphPreservation) {
                         Text("Conservative").tag(ParagraphPreservation.conservative)
@@ -708,6 +914,7 @@ struct SettingsView: View {
                 }
 
                 Section("Global Shortcuts") {
+                    ShortcutPicker(action: .clipboardHistory, model: model)
                     ShortcutPicker(action: .markdown, model: model)
                     ShortcutPicker(action: .cleanClipboard, model: model)
                     ShortcutPicker(action: .cleanURL, model: model)

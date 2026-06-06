@@ -31,6 +31,36 @@ Expected:
 
 Repeat in at least two browsers before a public release.
 
+## Clipboard History
+
+Clipboard History is opt-in and session-only.
+
+1. Enable Clipboard History and select a limit of 10 items.
+2. Copy 12 distinct pieces of text from different apps.
+3. Open Clipboard History, search for an older item, and select it.
+4. Disable Clipboard History, then enable it again.
+5. Quit and relaunch Tangle.
+
+Expected:
+
+- Only the newest 10 items remain.
+- Duplicate items move to the top without creating copies.
+- Search is case-insensitive and restoring an item writes it to the clipboard.
+- Disabling the feature clears all entries.
+- Relaunching Tangle starts with an empty history.
+- Images are not retained.
+
+Sensitive-content check:
+
+1. Copy a password from a supported password manager.
+2. Copy a password-like value such as `Abcd1234!`.
+3. Open Clipboard History.
+
+Expected:
+
+- Neither value appears.
+- Clipboard values marked concealed or transient by their source app never appear.
+
 ### Tracked URL
 
 1. Enable Auto-transform on copy.
@@ -78,6 +108,29 @@ Expected:
 - RTF clipboard content preserves basic inline structure such as bold and links.
 - Tracking parameters in links are cleaned.
 - Paste Clean Text on the same content returns readable plain text without Markdown markers.
+
+### PDF Application Matrix
+
+Run the following cases before a public release and record pass/fail in the release notes:
+
+| Source | Document | Action | Expected |
+| --- | --- | --- | --- |
+| Preview | selectable single-column PDF | Paste Markdown | text layer used; wrapped lines repaired |
+| Preview | scanned PDF | Paste Markdown | local OCR fallback; no empty output |
+| Safari | PDF opened in browser | Paste Markdown | readable text or OCR fallback |
+| Chrome | PDF opened in browser | Paste Markdown | readable text or OCR fallback |
+| Acrobat Reader | selectable PDF | Paste Markdown | readable text; repeated margins removed |
+| Any source | multi-column report | Paste Markdown | columns remain readable; no row interleaving |
+| Any source | numbered sections | Paste Markdown | `1`, `1.1`, `1.1.1` become conservative heading levels |
+| Any source | repeated header/footer | Paste Markdown | repeated margins and page numbers removed |
+| Any source | native text table | Paste Markdown | values retained; inspect table structure manually |
+| Any source | footnotes | Paste Markdown | footnote text retained without merging into body text |
+
+Known limits:
+
+- Native PDF tables do not yet expose a reliable grid through PDFKit text extraction.
+- Multi-column reading order depends on the ordering supplied by PDFKit.
+- Footnote references are preserved as text but are not always linked to definitions.
 
 ### Table
 

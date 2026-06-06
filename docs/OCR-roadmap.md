@@ -4,6 +4,16 @@
 > analisi comparativa con [MarkItDown](https://github.com/microsoft/markitdown)
 > (Microsoft) e code review automatizzata multi-agente.
 
+## Stato aggiornato — 6 giugno 2026
+
+- ✅ Ricostruzione tabelle da OCR implementata.
+- ✅ PDF clipboard con text layer implementato tramite PDFKit.
+- ✅ RTF clipboard implementato.
+- ✅ Clipboard History implementata come funzione opt-in, solo in memoria e text-only.
+- ✅ PDF scannerizzati senza text layer: fallback OCR locale tramite Apple Vision.
+- ✅ PDF complessi: rimozione conservativa di header/footer ripetuti e gerarchia per sezioni numerate.
+- ⏳ Da migliorare: tabelle native nel text layer PDF, note a piè pagina con riferimenti affidabili, layout PDF multi-colonna complessi.
+
 ---
 
 ## Test su casi reali

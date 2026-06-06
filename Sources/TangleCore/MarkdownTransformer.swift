@@ -8,14 +8,17 @@ public enum MarkdownPreset: String, Codable, Sendable, CaseIterable {
 public struct MarkdownTransformer: Sendable {
     public var preset: MarkdownPreset
     public var paragraphPreservation: ParagraphPreservation
+    public var inferUnmarkedHeadings: Bool
     private let protectedHeadingMarker = "\u{E000}"
 
     public init(
         preset: MarkdownPreset = .standard,
-        paragraphPreservation: ParagraphPreservation = .balanced
+        paragraphPreservation: ParagraphPreservation = .balanced,
+        inferUnmarkedHeadings: Bool = true
     ) {
         self.preset = preset
         self.paragraphPreservation = paragraphPreservation
+        self.inferUnmarkedHeadings = inferUnmarkedHeadings
     }
 
     public func transform(_ input: String) -> String {
@@ -33,6 +36,8 @@ public struct MarkdownTransformer: Sendable {
     }
 
     private func protectWebHeadings(in input: String) -> String {
+        guard inferUnmarkedHeadings else { return input }
+
         let normalized = input
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
@@ -191,6 +196,7 @@ private extension String {
     var looksLikePlainHeading: Bool {
         count >= 3
             && count <= 70
+            && !hasPrefix("#")
             && uppercased() == self
             && range(of: #"[A-ZÀ-ÖØ-Þ]"#, options: .regularExpression) != nil
             && range(of: #"^\d+$"#, options: .regularExpression) == nil

@@ -8,9 +8,12 @@ private enum GlobalShortcutID: UInt32, CaseIterable {
     case cleanURL = 3
     case markdown = 4
     case pasteCleanedText = 5
+    case clipboardHistory = 6
 
     init(action: TangleShortcutAction) {
         switch action {
+        case .clipboardHistory:
+            self = .clipboardHistory
         case .quickTransformPicker:
             self = .quickTransformPicker
         case .cleanClipboard:
@@ -39,6 +42,7 @@ final class GlobalShortcutManager {
 
     func register(
         shortcutKeys: [TangleShortcutAction: TangleShortcutKey],
+        clipboardHistory: @escaping @MainActor () -> Void,
         quickTransformPicker: @escaping @MainActor () -> Void,
         cleanClipboard: @escaping @MainActor () -> Void,
         cleanURL: @escaping @MainActor () -> Void,
@@ -49,6 +53,7 @@ final class GlobalShortcutManager {
         ShortcutActionStore.shared.removeAll()
 
         let actions: [(TangleShortcutAction, @MainActor () -> Void)] = [
+            (.clipboardHistory, clipboardHistory),
             (.quickTransformPicker, quickTransformPicker),
             (.cleanClipboard, cleanClipboard),
             (.cleanURL, cleanURL),

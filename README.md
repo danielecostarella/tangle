@@ -11,7 +11,7 @@ It sits in the menu bar. Copy anything — text, a screenshot, an image, Excel c
 - `TangleCore`: local transformation logic, clipboard access, and settings persistence.
 - `TangleGUI`: native SwiftUI menu bar app.
 - `tangle`: command-line interface for scripting and automation.
-- 59 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, image OCR formatting, PDF/RTF clipboard extraction, table detection, and bold formatting.
+- 66 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, image OCR formatting, PDF/RTF clipboard extraction, clipboard history, table detection, and bold formatting.
 
 ## Requirements
 
@@ -76,6 +76,8 @@ The two primary actions cover the most common cases automatically:
 - URL → cleaned URL
 
 For advanced use, **Quick Transform Picker** (`⌃⌥⌘P`) shows a before/after preview of every available transformation and lets you choose one before applying it.
+
+**Clipboard History** (`⌃⌥⌘B`) is an optional, session-only list of recently copied text. It is disabled by default, never written to disk, excludes images, respects macOS concealed/transient clipboard markers, and skips known password managers and password-like content.
 
 ## Everyday Examples
 
@@ -218,13 +220,14 @@ Menu bar actions:
 - **Paste Markdown**: `⌃⌥⌘M` — smart Markdown output for any clipboard content
 - **Paste Clean Text**: `⌃⌥⌘C` — smart plain text output for any clipboard content
 - **Quick Transform Picker**: `⌃⌥⌘P` — preview all transforms before applying
+- **Clipboard History**: `⌃⌥⌘B` — search and restore session-only clipboard text
 - **Clean URL**: `⌃⌥⌘U` — strip tracking parameters only
 
 Shortcuts are customizable in Settings. The modifier chord (`⌃⌥⌘`) is fixed for this release.
 
 The Quick Transform Picker shows a recommended transformation, estimated character and token savings, and a before/after preview — including an image thumbnail when the clipboard contains a screenshot.
 
-The Settings window includes: HUD feedback, auto-paste, auto-transform on copy, cleanup mode, Markdown preset, OCR confidence threshold, OCR language list, shortcut customization, and URL parameter controls.
+The Settings window includes: HUD feedback, auto-paste, auto-transform on copy, session-only clipboard history, cleanup mode, Markdown preset, OCR confidence threshold, OCR language list, shortcut customization, and URL parameter controls.
 
 Auto-paste simulates `⌘V` locally and requires macOS Accessibility permission. Auto-transform on copy is off by default; when enabled it skips code-like and password-like content.
 
@@ -298,6 +301,9 @@ Manual QA checklists live in [`docs/QA.md`](docs/QA.md).
 
 - Converts PDF/web text to conservative Markdown.
 - Reads PDF and RTF clipboard data locally when available, avoiding OCR when a text layer exists.
+- Removes repeated PDF page headers, footers, and page numbers before conversion.
+- Infers conservative heading hierarchy from numbered PDF sections.
+- Falls back to local Apple Vision OCR for scanned PDFs without a usable text layer.
 - Reads browser clipboard HTML to preserve headings, links, bold, italic, lists, quotes, code blocks, and tables.
 - Uses SwiftSoup for DOM-based HTML parsing.
 - Cleans tracking parameters from converted links.

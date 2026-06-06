@@ -1,6 +1,7 @@
 import Foundation
 
 public enum TangleShortcutAction: String, Codable, Sendable, CaseIterable {
+    case clipboardHistory
     case quickTransformPicker
     case cleanClipboard
     case cleanURL
@@ -9,6 +10,8 @@ public enum TangleShortcutAction: String, Codable, Sendable, CaseIterable {
 
     public var label: String {
         switch self {
+        case .clipboardHistory:
+            return "Clipboard History"
         case .quickTransformPicker:
             return "Quick Transform Picker"
         case .cleanClipboard:
@@ -43,6 +46,8 @@ public struct TangleSettings: Codable, Equatable, Sendable {
     public var autoPasteAfterTransform: Bool
     public var autoTransformOnCopy: Bool
     public var autoTransformConfidenceThreshold: Double
+    public var clipboardHistoryEnabled: Bool
+    public var clipboardHistoryLimit: Int
     public var ocrMinimumConfidence: Float
     public var ocrRecognitionLanguages: [String]
     public var paragraphPreservation: ParagraphPreservation
@@ -56,6 +61,8 @@ public struct TangleSettings: Codable, Equatable, Sendable {
         autoPasteAfterTransform: Bool = false,
         autoTransformOnCopy: Bool = false,
         autoTransformConfidenceThreshold: Double = 0.75,
+        clipboardHistoryEnabled: Bool = false,
+        clipboardHistoryLimit: Int = 20,
         ocrMinimumConfidence: Float = 0.35,
         ocrRecognitionLanguages: [String] = ["en-US", "it-IT"],
         paragraphPreservation: ParagraphPreservation = .balanced,
@@ -68,6 +75,8 @@ public struct TangleSettings: Codable, Equatable, Sendable {
         self.autoPasteAfterTransform = autoPasteAfterTransform
         self.autoTransformOnCopy = autoTransformOnCopy
         self.autoTransformConfidenceThreshold = autoTransformConfidenceThreshold
+        self.clipboardHistoryEnabled = clipboardHistoryEnabled
+        self.clipboardHistoryLimit = clipboardHistoryLimit
         self.ocrMinimumConfidence = ocrMinimumConfidence
         self.ocrRecognitionLanguages = ocrRecognitionLanguages
         self.paragraphPreservation = paragraphPreservation
@@ -82,6 +91,8 @@ public struct TangleSettings: Codable, Equatable, Sendable {
         case autoPasteAfterTransform
         case autoTransformOnCopy
         case autoTransformConfidenceThreshold
+        case clipboardHistoryEnabled
+        case clipboardHistoryLimit
         case ocrMinimumConfidence
         case ocrRecognitionLanguages
         case paragraphPreservation
@@ -98,6 +109,8 @@ public struct TangleSettings: Codable, Equatable, Sendable {
         autoPasteAfterTransform = try container.decodeIfPresent(Bool.self, forKey: .autoPasteAfterTransform) ?? false
         autoTransformOnCopy = try container.decodeIfPresent(Bool.self, forKey: .autoTransformOnCopy) ?? false
         autoTransformConfidenceThreshold = try container.decodeIfPresent(Double.self, forKey: .autoTransformConfidenceThreshold) ?? 0.75
+        clipboardHistoryEnabled = try container.decodeIfPresent(Bool.self, forKey: .clipboardHistoryEnabled) ?? false
+        clipboardHistoryLimit = try container.decodeIfPresent(Int.self, forKey: .clipboardHistoryLimit) ?? 20
         ocrMinimumConfidence = try container.decodeIfPresent(Float.self, forKey: .ocrMinimumConfidence) ?? 0.35
         ocrRecognitionLanguages = try container.decodeIfPresent([String].self, forKey: .ocrRecognitionLanguages) ?? ["en-US", "it-IT"]
         paragraphPreservation = try container.decodeIfPresent(ParagraphPreservation.self, forKey: .paragraphPreservation) ?? .balanced
@@ -108,6 +121,7 @@ public struct TangleSettings: Codable, Equatable, Sendable {
     }
 
     public static let defaultShortcutKeys: [TangleShortcutAction: TangleShortcutKey] = [
+        .clipboardHistory: .b,
         .quickTransformPicker: .p,
         .cleanClipboard: .c,
         .cleanURL: .u,

@@ -17,6 +17,8 @@ final class SettingsStoreTests: XCTestCase {
             autoPasteAfterTransform: true,
             autoTransformOnCopy: true,
             autoTransformConfidenceThreshold: 0.9,
+            clipboardHistoryEnabled: true,
+            clipboardHistoryLimit: 50,
             ocrMinimumConfidence: 0.55,
             ocrRecognitionLanguages: ["it-IT", "en-US"],
             paragraphPreservation: .aggressive,
@@ -54,6 +56,8 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(settings.autoPasteAfterTransform)
         XCTAssertFalse(settings.autoTransformOnCopy)
         XCTAssertEqual(settings.autoTransformConfidenceThreshold, 0.75)
+        XCTAssertFalse(settings.clipboardHistoryEnabled)
+        XCTAssertEqual(settings.clipboardHistoryLimit, 20)
         XCTAssertEqual(settings.ocrMinimumConfidence, 0.35)
         XCTAssertEqual(settings.ocrRecognitionLanguages, ["en-US", "it-IT"])
         XCTAssertEqual(settings.paragraphPreservation, .conservative)

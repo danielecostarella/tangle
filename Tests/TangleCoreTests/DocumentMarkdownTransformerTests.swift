@@ -27,9 +27,49 @@ final class DocumentMarkdownTransformerTests: XCTestCase {
         let markdown = try TangleTransformer(settings: TangleSettings(markdownPreset: .llm)).transformContent(content, kind: .markdown)
 
         XCTAssertEqual(markdown, """
-        ## Report Title
+        # REPORT TITLE
         Text copied from a PDF.
         """)
+    }
+
+    func testPDFMarkdownRemovesRepeatedMarginsAndCreatesHeadingHierarchy() throws {
+        let data = try makeTextPDF(pages: [
+            "PRIVATE REPORT\n1\n\nOverview\n\n1 Market Outlook\nBody text.",
+            "PRIVATE REPORT\n2\n\n2.1 Regional Detail\nMore body text."
+        ])
+
+        let markdown = DocumentMarkdownTransformer().transformPDF(
+            data: data,
+            preset: .standard,
+            paragraphPreservation: .balanced
+        )
+
+        XCTAssertEqual(markdown, """
+        Overview
+        ## Market Outlook
+        Body text.
+
+        ### Regional Detail
+        More body text.
+        """)
+    }
+
+    func testRasterizesPDFPagesForScannedDocumentFallback() throws {
+        let data = try makeTextPDF(pages: ["Page one", "Page two"])
+
+        XCTAssertEqual(DocumentMarkdownTransformer().rasterizedPDFPages(data: data).count, 2)
+    }
+
+    func testPDFBodyOpeningDoesNotBecomeDocumentTitle() throws {
+        let data = try makeTextPDF("This paragraph starts without punctuation\nand continues on the next line.")
+
+        let markdown = DocumentMarkdownTransformer().transformPDF(
+            data: data,
+            preset: .standard,
+            paragraphPreservation: .balanced
+        )
+
+        XCTAssertEqual(markdown, "This paragraph starts without punctuation and continues on the next line.")
     }
 
     func testSmartDetectsDocumentClipboard() {
@@ -41,6 +81,10 @@ final class DocumentMarkdownTransformerTests: XCTestCase {
     }
 
     private func makeTextPDF(_ text: String) throws -> Data {
+        try makeTextPDF(pages: [text])
+    }
+
+    private func makeTextPDF(pages: [String]) throws -> Data {
         let data = NSMutableData()
         var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
         guard let consumer = CGDataConsumer(data: data as CFMutableData),
@@ -48,15 +92,17 @@ final class DocumentMarkdownTransformerTests: XCTestCase {
             throw XCTSkip("Unable to create PDF context")
         }
 
-        context.beginPDFPage(nil)
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
-        NSString(string: text).draw(
-            in: CGRect(x: 72, y: 620, width: 460, height: 120),
-            withAttributes: [.font: NSFont.systemFont(ofSize: 18)]
-        )
-        NSGraphicsContext.restoreGraphicsState()
-        context.endPDFPage()
+        for text in pages {
+            context.beginPDFPage(nil)
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+            NSString(string: text).draw(
+                in: CGRect(x: 72, y: 500, width: 460, height: 240),
+                withAttributes: [.font: NSFont.systemFont(ofSize: 18)]
+            )
+            NSGraphicsContext.restoreGraphicsState()
+            context.endPDFPage()
+        }
         context.closePDF()
 
         return data as Data
