@@ -9,6 +9,7 @@ Tested from commit after `v0.1.14` using locally generated fixtures from
 | --- | --- | --- |
 | Clipboard History retention, ordering, duplicate handling, search | PASS | Covered by Core tests |
 | Clipboard History sensitive marker and password manager exclusion | PASS | Covered by privacy policy tests |
+| Flattened technical PDF table (`Symbol / Description / Min / Typ / Max / Unit`) | PASS | Smart Detect reconstructs rows; Clean Text emits TSV; Markdown emits a table |
 | Clipboard History password/API token exclusion | PASS | Password-like strings and common token prefixes skipped |
 | Clipboard History URL retention | PASS | URLs with query parameters are not mistaken for secrets |
 | PDF clipboard detection | PASS | Detected as `document`, routed to Markdown |

@@ -87,19 +87,7 @@ public struct SmartClipboardDetector: Sendable {
     }
 
     private func looksLikeTable(_ text: String) -> Bool {
-        let rows = text
-            .split(whereSeparator: \.isNewline)
-            .map(String.init)
-            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        guard rows.count >= 2 else { return false }
-
-        let separator: Character? = rows.contains { $0.contains("\t") } ? "\t" : ","
-        let columnCounts = rows.map { row in
-            separator.map { row.split(separator: $0, omittingEmptySubsequences: false).count } ?? 0
-        }
-
-        guard let first = columnCounts.first, first > 1 else { return false }
-        return columnCounts.allSatisfy { $0 == first }
+        TableConverter().looksLikeTable(text)
     }
 
     private func looksLikeCode(_ text: String) -> Bool {

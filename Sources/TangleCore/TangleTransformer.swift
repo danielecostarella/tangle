@@ -47,8 +47,7 @@ public struct TangleTransformer: Sendable {
             case .url:
                 return transform(input.text, kind: .cleanURL)
             case .table:
-                // Tabs are meaningful in TSV — just trim, do not flatten
-                return input.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                return TableConverter().convert(input.text, to: .tsv)
             default:
                 return TextCleaner(paragraphPreservation: settings.paragraphPreservation).clean(input.text)
             }
@@ -103,6 +102,9 @@ public struct TangleTransformer: Sendable {
         case .smart, .smartText:
             return transform(input, kind: .cleanText)
         case .cleanText, .plainPaste:
+            if TableConverter().reconstructedDatasheetRows(in: input) != nil {
+                return TableConverter().convert(input, to: .tsv)
+            }
             return TextCleaner(paragraphPreservation: settings.paragraphPreservation).clean(input)
         case .cleanURL:
             return URLCleaner(
@@ -110,6 +112,9 @@ public struct TangleTransformer: Sendable {
                 allowedParameters: settings.allowedURLParameters
             ).cleanURLs(in: input)
         case .markdown:
+            if TableConverter().looksLikeTable(input) {
+                return TableConverter().convert(input, to: .markdown)
+            }
             return MarkdownTransformer(
                 preset: settings.markdownPreset,
                 paragraphPreservation: settings.paragraphPreservation

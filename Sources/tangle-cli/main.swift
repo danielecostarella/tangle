@@ -81,7 +81,9 @@ struct Clean: ParsableCommand {
 
     func run() throws {
         let input = try Input.read(useClipboard: clipboard)
-        let output = TextCleaner(paragraphPreservation: mode.paragraphPreservation).clean(input)
+        let output = TangleTransformer(
+            settings: TangleSettings(paragraphPreservation: mode.paragraphPreservation)
+        ).transform(input, kind: .cleanText)
         if stats {
             Output.writeStats(input: input, output: output)
         }
@@ -130,9 +132,11 @@ struct Markdown: ParsableCommand {
     var stats = false
 
     func run() throws {
-        let transformer = MarkdownTransformer(
-            preset: preset.markdownPreset,
-            paragraphPreservation: mode.paragraphPreservation
+        let transformer = TangleTransformer(
+            settings: TangleSettings(
+                paragraphPreservation: mode.paragraphPreservation,
+                markdownPreset: preset.markdownPreset
+            )
         )
         let input: String
         let output: String
@@ -148,7 +152,7 @@ struct Markdown: ParsableCommand {
             ).transformContent(content, kind: .markdown)
         } else {
             input = try Input.read(useClipboard: false)
-            output = transformer.transform(input)
+            output = transformer.transform(input, kind: .markdown)
         }
 
         if stats {

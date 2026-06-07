@@ -49,4 +49,13 @@ final class SmartClipboardDetectorTests: XCTestCase {
         | Alpha | 42 |
         """)
     }
+
+    func testDetectsFlattenedDatasheetTable() {
+        let input = "Power Consumption Symbol Description Min Typ Max Unit VINMax Maximum input voltage from VIN pad 6 - 20 V VUSBMax Maximum input voltage from USB connector - 5.5 V PMax Maximum Power Consumption - - xx mA"
+
+        let detection = SmartClipboardDetector().detect(input)
+
+        XCTAssertEqual(detection.kind, .table)
+        XCTAssertEqual(detection.recommendedTransformation, .tableMarkdown)
+    }
 }

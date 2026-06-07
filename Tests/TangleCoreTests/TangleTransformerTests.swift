@@ -74,4 +74,26 @@ final class TangleTransformerTests: XCTestCase {
         XCTAssertTrue(output.contains("Acme"), "Should preserve cell content")
         XCTAssertFalse(output == "Name Revenue Acme 100000 Beta 80000", "Should not flatten to a single line")
     }
+
+    func testFlattenedDatasheetTableBecomesReadableCleanText() {
+        let input = "Power Consumption Symbol Description Min Typ Max Unit VINMax Maximum input voltage from VIN pad 6 - 20 V VUSBMax Maximum input voltage from USB connector - 5.5 V PMax Maximum Power Consumption - - xx mA"
+
+        let output = TangleTransformer().transform(input, kind: .cleanText)
+
+        XCTAssertEqual(output, """
+        Symbol\tDescription\tMin\tTyp\tMax\tUnit
+        VINMax\tMaximum input voltage from VIN pad\t6\t-\t20\tV
+        VUSBMax\tMaximum input voltage from USB connector\t\t-\t5.5\tV
+        PMax\tMaximum Power Consumption\t-\t-\txx\tmA
+        """)
+    }
+
+    func testFlattenedDatasheetTableBecomesMarkdown() {
+        let input = "Power Consumption Symbol Description Min Typ Max Unit VINMax Maximum input voltage from VIN pad 6 - 20 V VUSBMax Maximum input voltage from USB connector - 5.5 V PMax Maximum Power Consumption - - xx mA"
+
+        let output = TangleTransformer().transform(input, kind: .markdown)
+
+        XCTAssertTrue(output.contains("| VINMax | Maximum input voltage from VIN pad | 6 | - | 20 | V |"))
+        XCTAssertTrue(output.contains("| VUSBMax | Maximum input voltage from USB connector |  | - | 5.5 | V |"))
+    }
 }
