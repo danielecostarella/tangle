@@ -20,19 +20,28 @@ Tested from commit after `v0.1.14` using locally generated fixtures from
 | PDF simple footnote reference and definition | PASS | Emits Markdown footnote syntax |
 | PDF native text table | PARTIAL | Values retained, but PDFKit exposes them as flat text |
 | CLI Markdown with PDF/RTF clipboard | PASS | CLI now uses the same document pipeline as the GUI |
+| Preview selectable PDF | PASS | Real app copy; PDF-style HTML routed through document cleanup when page markers exist |
+| Preview scanned PDF | PASS | Real app copy; local OCR fallback |
+| Preview multi-column PDF | PASS | Real app copy preserves left-to-right reading order |
+| Preview native text table | PASS | Preview HTML exposes a table and Tangle emits Markdown |
+| Preview footnotes | PARTIAL | Text retained, but Preview HTML does not expose the semantic reference |
+| Adobe Acrobat selectable PDF | PASS | Real app copy; repeated margins removed |
+| Adobe Acrobat rich document detection | PASS | RTF/PDF content with a plain-text fallback now routes to Markdown |
+| Adobe Acrobat multiline RTF formatting | PASS | Markdown markers remain balanced; Acrobat may mark most copied text italic |
+| Safari PDF viewer | INCONCLUSIVE | Synthetic Select All copies the local file URL, not PDF content |
+| Chrome PDF viewer | INCONCLUSIVE | Synthetic Select All copies the local file URL, not PDF content |
 
 ## Native Application Matrix
 
-Preview, Safari, Google Chrome, and Adobe Acrobat are installed. Automated
-copy-selection tests could not run because macOS denied Accessibility permission
-to `osascript` for synthetic `Command-A` / `Command-C` events.
+Preview and Adobe Acrobat were tested end-to-end with real application clipboard
+output after Accessibility permission was granted. Safari and Chrome remain
+inconclusive because their PDF viewers keep Select All focused on the address bar
+under synthetic keyboard input.
 
 These cases remain manual:
 
-- Copying a selection from Preview
-- Copying from Safari's PDF viewer
-- Copying from Chrome's PDF viewer
-- Copying from Adobe Acrobat
+- Selecting PDF body text in Safari's PDF viewer
+- Selecting PDF body text in Chrome's PDF viewer
 - Visual verification of the Clipboard History panel
 
 ## Fixes Found During QA
@@ -44,3 +53,6 @@ These cases remain manual:
 - Moved clipboard history privacy decisions into testable Core logic.
 - Made `tangle markdown --clipboard` use the full PDF/RTF document pipeline.
 - Made packaged app bundle versions derive from the Git release tag.
+- Routed Preview-style copied PDF text through document cleanup before HTML.
+- Routed RTF/PDF clipboard content with plain-text fallbacks to Markdown.
+- Applied RTF inline formatting per line to prevent dangling Markdown markers.

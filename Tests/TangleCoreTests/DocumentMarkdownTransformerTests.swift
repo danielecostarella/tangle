@@ -21,6 +21,27 @@ final class DocumentMarkdownTransformerTests: XCTestCase {
         XCTAssertEqual(plainText, "Rich link")
     }
 
+    func testRTFMarkdownDoesNotWrapMultilineRunsWithDanglingMarkers() throws {
+        let attributed = NSMutableAttributedString(string: "FIRST LINE\nSECOND LINE")
+        attributed.addAttribute(
+            .font,
+            value: NSFontManager.shared.convert(NSFont.systemFont(ofSize: 14), toHaveTrait: .italicFontMask),
+            range: NSRange(location: 0, length: attributed.length)
+        )
+        let data = try attributed.data(
+            from: NSRange(location: 0, length: attributed.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+        )
+
+        let markdown = DocumentMarkdownTransformer().transformRTF(
+            data: data,
+            preset: .standard,
+            paragraphPreservation: .balanced
+        )
+
+        XCTAssertEqual(markdown, "_FIRST LINE_\n_SECOND LINE_")
+    }
+
     func testPDFMarkdownUsesTextLayer() throws {
         let data = try makeTextPDF("REPORT TITLE\n\nText copied\nfrom a PDF.")
         let content = ClipboardContent(text: "", pdfData: data)
@@ -98,8 +119,44 @@ final class DocumentMarkdownTransformerTests: XCTestCase {
         """)
     }
 
+    func testTransformsPreviewStyleCopiedPDFTextBeforeHTML() throws {
+        let text = """
+        TANGLE QA REPORT
+        1 Overview
+        This selectable paragraph is deliberately wrapped across
+        several lines.
+        TANGLE QA REPORT Page 1 of 2
+        TANGLE QA REPORT
+        1.1 Details
+        A second page verifies repeated header removal.
+        TANGLE QA REPORT Page 2 of 2
+        """
+        let content = ClipboardContent(text: text, html: "<p>Unclean HTML fallback</p>")
+
+        let detection = SmartClipboardDetector().detect(content)
+        let markdown = try TangleTransformer().transformContent(content, kind: .markdown)
+
+        XCTAssertEqual(detection.kind, .document)
+        XCTAssertFalse(markdown.contains("TANGLE QA REPORT"))
+        XCTAssertFalse(markdown.contains("Page 1"))
+        XCTAssertTrue(markdown.contains("## Overview"))
+        XCTAssertTrue(markdown.contains("### Details"))
+    }
+
     func testSmartDetectsDocumentClipboard() {
         let content = ClipboardContent(text: "", rtfData: Data([0x7b, 0x5c, 0x72, 0x74, 0x66]))
+        let detection = SmartClipboardDetector().detect(content)
+
+        XCTAssertEqual(detection.kind, .document)
+        XCTAssertEqual(detection.recommendedTransformation, .markdown)
+    }
+
+    func testSmartDetectsRichDocumentEvenWhenPlainTextIsAvailable() {
+        let content = ClipboardContent(
+            text: "Plain fallback",
+            rtfData: Data([0x7b, 0x5c, 0x72, 0x74, 0x66])
+        )
+
         let detection = SmartClipboardDetector().detect(content)
 
         XCTAssertEqual(detection.kind, .document)

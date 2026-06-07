@@ -5,6 +5,40 @@ import PDFKit
 public struct DocumentMarkdownTransformer: Sendable {
     public init() {}
 
+    public func looksLikeExtractedPDFText(_ text: String) -> Bool {
+        let pageMarkers = text.matches(
+            #"(?i)\bpage\s+\d+(?:\s+of\s+\d+)?\b"#
+        )
+        guard pageMarkers >= 2 else { return false }
+
+        let normalizedLines = text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces).pageMarginIdentity }
+            .filter { !$0.isEmpty && $0.count <= 120 }
+        let repeatedLineCount = Dictionary(grouping: normalizedLines, by: { $0 })
+            .values
+            .filter { $0.count >= 2 }
+            .count
+        return repeatedLineCount >= 1
+    }
+
+    public func transformExtractedPDFText(
+        _ text: String,
+        preset: MarkdownPreset,
+        paragraphPreservation: ParagraphPreservation
+    ) -> String {
+        let pages = splitExtractedPDFTextIntoPages(text)
+        let cleaned = removeRepeatedPageMargins(from: pages)
+            .map { $0.joined(separator: "\n") }
+            .joined(separator: "\n\n")
+
+        return MarkdownTransformer(
+            preset: preset,
+            paragraphPreservation: paragraphPreservation,
+            inferUnmarkedHeadings: false
+        ).transform(structurePDFText(cleaned))
+    }
+
     public func transformPDF(data: Data, preset: MarkdownPreset, paragraphPreservation: ParagraphPreservation) -> String? {
         guard let text = extractPDFText(data: data) else { return nil }
 
@@ -103,6 +137,23 @@ public struct DocumentMarkdownTransformer: Sendable {
         }
     }
 
+    private func splitExtractedPDFTextIntoPages(_ text: String) -> [[String]] {
+        let lines = text.components(separatedBy: .newlines)
+        var pages: [[String]] = [[]]
+
+        for line in lines {
+            pages[pages.count - 1].append(line)
+            if line.range(
+                of: #"\bpage\s+\d+(?:\s+of\s+\d+)?\b"#,
+                options: [.regularExpression, .caseInsensitive]
+            ) != nil {
+                pages.append([])
+            }
+        }
+
+        return pages.filter { !$0.allSatisfy { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
+    }
+
     private func structurePDFText(_ text: String) -> String {
         let lines = text.components(separatedBy: "\n")
         let firstContentIndex = lines.firstIndex { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -157,6 +208,15 @@ public struct DocumentMarkdownTransformer: Sendable {
     }
 
     private func applyInlineMarkdown(_ text: String, attributes: [NSAttributedString.Key: Any]) -> String {
+        if text.contains("\n") {
+            return text
+                .components(separatedBy: "\n")
+                .map { line in
+                    line.isEmpty ? "" : applyInlineMarkdown(line, attributes: attributes)
+                }
+                .joined(separator: "\n")
+        }
+
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return text }
 
         let font = attributes[.font] as? NSFont
@@ -181,6 +241,12 @@ public struct DocumentMarkdownTransformer: Sendable {
 }
 
 private extension String {
+    func matches(_ pattern: String) -> Int {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return 0 }
+        let range = NSRange(startIndex..<endIndex, in: self)
+        return regex.numberOfMatches(in: self, range: range)
+    }
+
     var pageMarginIdentity: String {
         replacingOccurrences(
             of: #"\bpage\s+\d+(?:\s+of\s+\d+)?\b"#,

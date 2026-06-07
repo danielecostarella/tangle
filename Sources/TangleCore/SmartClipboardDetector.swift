@@ -31,11 +31,15 @@ public struct SmartClipboardDetector: Sendable {
     public init() {}
 
     public func detect(_ content: ClipboardContent) -> SmartClipboardDetection {
+        if DocumentMarkdownTransformer().looksLikeExtractedPDFText(content.text) {
+            return SmartClipboardDetection(kind: .document, confidence: 0.9, recommendedTransformation: .markdown)
+        }
+
         if let html = content.html?.trimmingCharacters(in: .whitespacesAndNewlines), !html.isEmpty {
             return SmartClipboardDetection(kind: .richHTML, confidence: 0.95, recommendedTransformation: .markdown)
         }
 
-        if content.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, content.hasRichDocument {
+        if content.hasRichDocument {
             return SmartClipboardDetection(kind: .document, confidence: 0.85, recommendedTransformation: .markdown)
         }
 

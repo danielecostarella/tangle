@@ -54,6 +54,15 @@ public struct TangleTransformer: Sendable {
             }
         }
 
+        if case .markdown = kind,
+           DocumentMarkdownTransformer().looksLikeExtractedPDFText(input.text) {
+            return DocumentMarkdownTransformer().transformExtractedPDFText(
+                input.text,
+                preset: settings.markdownPreset,
+                paragraphPreservation: settings.paragraphPreservation
+            )
+        }
+
         if case .markdown = kind, let html = input.html?.nonEmptyHTML {
             return MarkdownTransformer(
                 preset: settings.markdownPreset,
