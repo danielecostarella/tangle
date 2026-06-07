@@ -26,6 +26,11 @@ cp ".build/release/tangle" "$RESOURCES_DIR/tangle"
 cp "Resources/Info.plist" "$CONTENTS_DIR/Info.plist"
 cp "$BUILD_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 
+VERSION="${TANGLE_VERSION:-$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.0")}"
+BUILD_NUMBER="${TANGLE_BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo "1")}"
+plutil -replace CFBundleShortVersionString -string "$VERSION" "$CONTENTS_DIR/Info.plist"
+plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$CONTENTS_DIR/Info.plist"
+
 chmod +x "$MACOS_DIR/TangleGUI"
 chmod +x "$RESOURCES_DIR/tangle"
 

@@ -143,6 +143,7 @@ public struct TextCleaner: Sendable {
 
     private func shouldPreserveLineBreak(_ line: String) -> Bool {
         line.hasPrefix("#")
+            || line.hasPrefix("[^")
             || line.hasPrefix(">")
             || line.hasPrefix("- ")
             || line.hasPrefix("* ")

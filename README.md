@@ -11,7 +11,7 @@ It sits in the menu bar. Copy anything — text, a screenshot, an image, Excel c
 - `TangleCore`: local transformation logic, clipboard access, and settings persistence.
 - `TangleGUI`: native SwiftUI menu bar app.
 - `tangle`: command-line interface for scripting and automation.
-- 66 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, image OCR formatting, PDF/RTF clipboard extraction, clipboard history, table detection, and bold formatting.
+- 69 unit tests covering text cleanup, URL cleaning, Markdown conversion, smart detection, image OCR formatting, PDF/RTF clipboard extraction, clipboard history, table detection, and bold formatting.
 
 ## Requirements
 

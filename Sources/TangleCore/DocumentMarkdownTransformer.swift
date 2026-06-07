@@ -85,11 +85,11 @@ public struct DocumentMarkdownTransformer: Sendable {
 
         let marginLines = pages.flatMap { page -> Set<String> in
             let nonEmpty = page.filter { !$0.isEmpty }
-            return Set(Array(nonEmpty.prefix(3)) + Array(nonEmpty.suffix(3)))
+            return Set((Array(nonEmpty.prefix(3)) + Array(nonEmpty.suffix(3))).map(\.pageMarginIdentity))
         }
         let counts = Dictionary(grouping: marginLines, by: { $0 }).mapValues(\.count)
         let repeated = Set<String>(counts.compactMap { line, count in
-            guard count >= 2, line.count <= 120 else { return nil }
+            guard count >= 2, !line.isEmpty, line.count <= 120 else { return nil }
             return line
         })
 
@@ -98,7 +98,7 @@ public struct DocumentMarkdownTransformer: Sendable {
                 if line.range(of: #"^(page\s+)?\d+(\s+of\s+\d+)?$"#, options: [.regularExpression, .caseInsensitive]) != nil {
                     return false
                 }
-                return !repeated.contains(line)
+                return !repeated.contains(line.pageMarginIdentity)
             }
         }
     }
@@ -129,7 +129,11 @@ public struct DocumentMarkdownTransformer: Sendable {
                 return "[^\(match.1)]: \(match.2)"
             }
 
-            return line
+            return line.replacingOccurrences(
+                of: #"([.!?])(\d{1,3})$"#,
+                with: "$1[^$2]",
+                options: .regularExpression
+            )
         }.joined(separator: "\n")
     }
 
@@ -177,6 +181,17 @@ public struct DocumentMarkdownTransformer: Sendable {
 }
 
 private extension String {
+    var pageMarginIdentity: String {
+        replacingOccurrences(
+            of: #"\bpage\s+\d+(?:\s+of\s+\d+)?\b"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+    }
+
     func isLikelyPDFTitle(nextLine: String?) -> Bool {
         let words = split(whereSeparator: \.isWhitespace)
         guard count >= 3,

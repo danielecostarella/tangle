@@ -68,3 +68,58 @@ public struct ClipboardHistory: Sendable {
         }
     }
 }
+
+public struct ClipboardHistoryPrivacyPolicy: Sendable {
+    public init() {}
+
+    public func shouldRecord(
+        text: String,
+        isSensitive: Bool = false,
+        sourceBundleIdentifier: String? = nil
+    ) -> Bool {
+        guard !isSensitive,
+              !Self.passwordManagerBundleIdentifiers.contains(sourceBundleIdentifier ?? "") else {
+            return false
+        }
+
+        if text.looksLikeURL {
+            return true
+        }
+
+        guard !text.looksLikeSecretFragment else { return false }
+        return true
+    }
+
+    public static let passwordManagerBundleIdentifiers: Set<String> = [
+        "com.1password.1password",
+        "com.1password.1password7",
+        "com.agilebits.onepassword7",
+        "com.bitwarden.desktop",
+        "com.dashlane.dashlanephonefinal",
+        "com.lastpass.LastPass",
+        "com.getdropbox.DropboxPasswordManager",
+        "com.keepassx.keepassxc"
+    ]
+}
+
+private extension String {
+    var looksLikeURL: Bool {
+        guard let url = URL(string: self),
+              let scheme = url.scheme?.lowercased() else {
+            return false
+        }
+        return scheme == "http" || scheme == "https"
+    }
+
+    var looksLikeSecretFragment: Bool {
+        guard !contains(where: \.isWhitespace), count >= 8 else { return false }
+
+        let hasDigit = range(of: #"[0-9]"#, options: .regularExpression) != nil
+        let hasSymbol = range(of: #"[^A-Za-z0-9]"#, options: .regularExpression) != nil
+        let knownSecretPrefix = range(
+            of: #"^(sk-|ghp_|github_pat_|xox[baprs]-|AKIA|eyJ)"#,
+            options: .regularExpression
+        ) != nil
+        return knownSecretPrefix || (hasDigit && hasSymbol)
+    }
+}

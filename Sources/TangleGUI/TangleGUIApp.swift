@@ -120,6 +120,7 @@ final class TangleAppModel: ObservableObject {
     private var observedPasteboardChangeCount = NSPasteboard.general.changeCount
     private var originalClipboardBeforeAutoTransform: String?
     private var clipboardHistory = ClipboardHistory()
+    private let clipboardHistoryPrivacy = ClipboardHistoryPrivacyPolicy()
 
     init() {
         settings = store.load()
@@ -415,7 +416,10 @@ final class TangleAppModel: ObservableObject {
               detection.confidence >= settings.autoTransformConfidenceThreshold,
               detection.kind != .code,
               !text.looksLikePasswordFragment,
-              !Self.passwordManagerBundleIdentifiers.contains(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "") else {
+              clipboardHistoryPrivacy.shouldRecord(
+                text: text,
+                sourceBundleIdentifier: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+              ) else {
             return false
         }
 
@@ -431,7 +435,7 @@ final class TangleAppModel: ObservableObject {
     }
 
     private func recordClipboardHistory(_ content: ClipboardContent) {
-        guard settings.clipboardHistoryEnabled, !content.isSensitive else { return }
+        guard settings.clipboardHistoryEnabled else { return }
 
         let text: String
         if !content.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -446,13 +450,16 @@ final class TangleAppModel: ObservableObject {
             return
         }
 
-        recordClipboardHistory(text)
+        recordClipboardHistory(text, isSensitive: content.isSensitive)
     }
 
-    private func recordClipboardHistory(_ text: String) {
+    private func recordClipboardHistory(_ text: String, isSensitive: Bool = false) {
         guard settings.clipboardHistoryEnabled,
-              !text.looksLikePasswordFragment,
-              !Self.passwordManagerBundleIdentifiers.contains(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "") else {
+              clipboardHistoryPrivacy.shouldRecord(
+                text: text,
+                isSensitive: isSensitive,
+                sourceBundleIdentifier: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+              ) else {
             return
         }
 
@@ -481,19 +488,6 @@ final class TangleAppModel: ObservableObject {
         keyDown?.post(tap: .cghidEventTap)
         keyUp?.post(tap: .cghidEventTap)
     }
-}
-
-private extension TangleAppModel {
-    static let passwordManagerBundleIdentifiers: Set<String> = [
-        "com.1password.1password",
-        "com.1password.1password7",
-        "com.agilebits.onepassword7",
-        "com.bitwarden.desktop",
-        "com.dashlane.dashlanephonefinal",
-        "com.lastpass.LastPass",
-        "com.getdropbox.DropboxPasswordManager",
-        "com.keepassx.keepassxc"
-    ]
 }
 
 private extension ClipboardContent {

@@ -10,6 +10,14 @@ This checklist covers manual release testing that unit tests cannot fully prove 
 - Open Settings and keep HUD enabled so transformation feedback is visible.
 - Confirm Auto-transform on copy starts disabled by default.
 
+Generate the reproducible local PDF fixtures with:
+
+```sh
+swift scripts/generate-qa-fixtures.swift
+```
+
+The generated files live in `.qa-fixtures/` and are ignored by Git.
+
 ## Auto-transform on Copy
 
 Auto-transform on copy is intentionally opt-in. It should transform only when Smart Detect is confident, and it must never call network services.

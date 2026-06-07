@@ -3,5 +3,6 @@
 build/
 dist/
 DerivedData/
+.qa-fixtures/
 *.xcuserdata/
 .DS_Store

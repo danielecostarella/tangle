@@ -140,11 +140,12 @@ struct Markdown: ParsableCommand {
         if clipboard {
             let content = try ClipboardClient().readContent()
             input = content.text
-            if let html = content.html?.trimmingCharacters(in: .whitespacesAndNewlines), !html.isEmpty {
-                output = transformer.transform(html: html, fallbackText: content.text)
-            } else {
-                output = transformer.transform(content.text)
-            }
+            output = try TangleTransformer(
+                settings: TangleSettings(
+                    paragraphPreservation: mode.paragraphPreservation,
+                    markdownPreset: preset.markdownPreset
+                )
+            ).transformContent(content, kind: .markdown)
         } else {
             input = try Input.read(useClipboard: false)
             output = transformer.transform(input)

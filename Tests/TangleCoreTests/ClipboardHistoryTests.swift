@@ -36,4 +36,15 @@ final class ClipboardHistoryTests: XCTestCase {
 
         XCTAssertEqual(history.search("REPORT").map(\.text), ["Quarterly Report"])
     }
+
+    func testPrivacyPolicyRejectsSensitiveAndPasswordManagerContent() {
+        let policy = ClipboardHistoryPrivacyPolicy()
+
+        XCTAssertFalse(policy.shouldRecord(text: "normal text", isSensitive: true))
+        XCTAssertFalse(policy.shouldRecord(text: "normal text", sourceBundleIdentifier: "com.1password.1password"))
+        XCTAssertFalse(policy.shouldRecord(text: "Abcd1234!"))
+        XCTAssertFalse(policy.shouldRecord(text: "sk-proj-exampletoken"))
+        XCTAssertTrue(policy.shouldRecord(text: "A normal clipboard paragraph."))
+        XCTAssertTrue(policy.shouldRecord(text: "https://example.com/report?id=42"))
+    }
 }

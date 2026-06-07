@@ -271,6 +271,7 @@ private extension String {
 
     var isMarkdownProse: Bool {
         !hasPrefix("#")
+            && !hasPrefix("[^")
             && !hasPrefix("- ")
             && !hasPrefix("* ")
             && !hasPrefix("+ ")
